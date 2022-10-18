@@ -4,6 +4,8 @@ import resource "k8s.io/apimachinery/pkg/api/resource"
 
 type QuantityByPriorityAndResourceType map[int32]ResourceList
 
+var zero = resource.MustParse("0")
+
 func (a QuantityByPriorityAndResourceType) DeepCopy() QuantityByPriorityAndResourceType {
 	rv := make(QuantityByPriorityAndResourceType)
 	for p, rl := range a {
@@ -227,26 +229,26 @@ func (availableByPriorityAndResourceType AvailableByPriorityAndResourceType) Get
 	}
 	quantityByResourceType, ok := availableByPriorityAndResourceType[priority]
 	if !ok {
-		return resource.MustParse("0")
+		return zero
 	}
 	q, ok := quantityByResourceType.Resources[resourceType]
 	if !ok {
-		return resource.MustParse("0")
+		return zero
 	}
 	return q
 }
 
 func (assignedByPriorityAndResourceType AssignedByPriorityAndResourceType) Get(priority int32, resourceType string) resource.Quantity {
 	if assignedByPriorityAndResourceType == nil {
-		return resource.MustParse("0")
+		return zero
 	}
 	quantityByResourceType, ok := assignedByPriorityAndResourceType[priority]
 	if !ok {
-		return resource.MustParse("0")
+		return zero
 	}
 	q, ok := quantityByResourceType.Resources[resourceType]
 	if !ok {
-		return resource.MustParse("0")
+		return zero
 	}
 	return q
 }
