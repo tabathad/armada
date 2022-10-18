@@ -54,12 +54,15 @@ type InsufficientResources struct {
 }
 
 func (err *InsufficientResources) String() string {
-	return fmt.Sprintf(
-		"pod requires %s %s, but only %s is available",
-		err.Required.String(),
-		err.Resource,
-		err.Available.String(),
-	)
+	if err.Resource == "cpu" {
+		return "insufficient cpu available"
+	} else if err.Resource == "memory" {
+		return "insufficient memory available"
+	} else if err.Resource == "nvidia.com/gpu" {
+		return "insufficient nvidia.com/gpu available"
+	} else {
+		return fmt.Sprintf("insufficient %s available", err.Resource)
+	}
 }
 
 // PodRequirementsMet determines whether a pod can be scheduled on nodes of this NodeType.

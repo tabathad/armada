@@ -248,12 +248,12 @@ func benchmarkSchedule(
 			jobRepository,
 			priorityFactorByQueue,
 		)
-		scheduler.SchedulingReportsRepository = NewSchedulingReportsRepository(1000, 1000)
+		//scheduler.SchedulingReportsRepository = NewSchedulingReportsRepository(1000, 1000)
 
 		if err != nil {
 			panic(err)
 		}
-		scheduledJobs, _, err := scheduler.Schedule(ctx.Background(), initialUsageByQueue)
+		scheduledJobs, err := scheduler.Schedule(ctx.Background(), initialUsageByQueue)
 		if err != nil {
 			panic(err)
 		}
