@@ -175,14 +175,16 @@ func podNodeAffinityRequirementsMet(nodeLabels map[string]string, req *PodRequir
 }
 
 func podResourceRequirementsMet(priority int32, availableResources AvailableByPriorityAndResourceType, assignedResources AssignedByPriorityAndResourceType, req *PodRequirements) (bool, PodRequirementsNotMetReason, error) {
+
 	available := resource.Quantity{}
 	for resource, required := range req.ResourceRequirements.Requests {
-		q := availableResources.Get(req.Priority, string(resource))
+		resourceAsString := string(resource)
+		q := availableResources.Get(req.Priority, resourceAsString)
 		q.DeepCopyInto(&available)
-		available.Sub(assignedResources.Get(req.Priority, string(resource)))
+		available.Sub(assignedResources.Get(req.Priority, resourceAsString))
 		if required.Cmp(available) == 1 {
 			return false, &InsufficientResources{
-				Resource:  string(resource),
+				Resource:  resourceAsString,
 				Required:  required,
 				Available: available,
 			}, nil
