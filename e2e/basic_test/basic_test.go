@@ -3,6 +3,7 @@ package basic_test
 import (
 	"context"
 	"fmt"
+	"k8s.io/utils/pointer"
 	"os"
 	"os/exec"
 	"strconv"
@@ -25,6 +26,12 @@ const integrationEnabledEnvVar = "INTEGRATION_ENABLED"
 // Location of the armadactl executable, which is needed by some tests.
 // Path is relative to this file.
 const armadactlExecutable = "../../bin/armadactl"
+
+//func TestFish(t *testing.T) {
+//	jobRequest := createJobRequest("personal-anonymous")
+//	priority, _ := schedulerobjects.PriorityFromPodSpec(jobRequest.JobRequestItems[0].PodSpec, map[string]int32{})
+//	println(fmt.Sprintf("priority is %d", priority))
+//}
 
 func TestCanSubmitJob_ReceivingAllExpectedEvents(t *testing.T) {
 	skipIfIntegrationEnvNotPresent(t)
@@ -221,8 +228,9 @@ func createJobRequest(namespace string) *api.JobSubmitRequest {
 							},
 						},
 					},
+					Priority: pointer.Int32(0),
 				},
-				Priority: 0,
+				Priority: 1,
 			},
 		},
 	}
