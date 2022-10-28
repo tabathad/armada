@@ -222,7 +222,7 @@ func createJobRequest(namespace string) *api.JobSubmitRequest {
 						},
 					},
 				},
-				Priority: 1,
+				Priority: 0,
 			},
 		},
 	}

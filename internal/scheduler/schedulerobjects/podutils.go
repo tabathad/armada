@@ -67,7 +67,7 @@ func ResourceListFromV1ResourceList(rl v1.ResourceList) ResourceList {
 }
 
 // PriorityFromPodSpec returns the priority set in a pod spec.
-// If priority is set diectly, that value is returned.
+// If priority is set directly, that value is returned.
 // Otherwise, it returns priorityByPriorityClassName[podSpec.PriorityClassName].
 // ok is false if no priority is set for this pod spec, in which case priority is 0.
 func PriorityFromPodSpec(podSpec *v1.PodSpec, priorityByPriorityClassName map[string]int32) (priority int32, ok bool) {
