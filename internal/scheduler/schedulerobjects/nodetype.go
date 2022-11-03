@@ -42,10 +42,6 @@ func NewNodeType(taints []v1.Taint, labels map[string]string, indexedTaints map[
 		taints = slices.Clone(taints)
 	}
 
-	// Sort taints to ensure node type id is consistent regardless of
-	// the order in which taints are set on the node.
-	slices.SortFunc(taints, func(a, b v1.Taint) bool { return a.Key < b.Key })
-
 	// Filter out any labels that should not be indexed.
 	if indexedLabels != nil {
 		labels = getFilteredLabels(labels, func(key, _ string) bool {
@@ -83,8 +79,10 @@ func NewNodeType(taints []v1.Taint, labels map[string]string, indexedTaints map[
 // https://man.archlinux.org/man/community/kubectl/kubectl-taint.1.en
 func nodeTypeIdFromTaintsAndLabels(taints []v1.Taint, labels, unsetIndexedLabels map[string]string) string {
 	// TODO: To reduce key size (and thus improve performance), we could hash the string.
-	// TODO: We should test this function to ensure there are no collisions. And that the string is never empty.
 	var sb strings.Builder
+	// Sort taints to ensure node type id is consistent regardless of
+	// the order in which taints are set on the node.
+	slices.SortFunc(taints, func(a, b v1.Taint) bool { return a.Key < b.Key })
 	for _, taint := range taints {
 		sb.WriteString("$")
 		sb.WriteString(taint.String())
