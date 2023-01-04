@@ -40,6 +40,181 @@ import (
 	"github.com/G-Research/armada/pkg/api"
 )
 
+type Server struct {
+	id uuid.UUID
+
+	pool *pgxpool.Pool
+
+	pulsarClient           pulsar.Client
+	pulsarCompressionType  pulsar.CompressionType
+	pulsarCompressionLevel pulsar.CompressionLevel
+
+	config configuration.ArmadaConfig
+	Log    log.Entry
+}
+
+func New(config configuration.ArmadaConfig) *Server {
+
+	return &Server{
+		id:     uuid.New(),
+		config: config,
+	}
+}
+
+func (srv *Server) ListenAndServe(ctx context.Context) error {
+
+	// TODO: Get logger from ctx.
+	// TODO: Pretty-print config.
+	// TODO: Look into how health checks work.
+
+	authServices := auth.ConfigureAuth(srv.config.Auth)
+	grpcServer := grpcCommon.CreateGrpcServer(
+		srv.config.Grpc.KeepaliveParams,
+		srv.config.Grpc.KeepaliveEnforcementPolicy,
+		authServices,
+	)
+
+	redisDb := redis.NewUniversalClient(&srv.config.Redis)
+	defer func() {
+		if err := redisDb.Close(); err != nil {
+			log.WithError(err).Error("failed to close Redis client")
+		}
+	}()
+	jobRepository := repository.NewRedisJobRepository(redisDb, srv.config.DatabaseRetention)
+	usageRepository := repository.NewRedisUsageRepository(redisDb)
+	queueRepository := repository.NewRedisQueueRepository(redisDb)
+	schedulingInfoRepository := repository.NewRedisSchedulingInfoRepository(redisDb)
+
+	legacyEventDb := redis.NewUniversalClient(&srv.config.EventsRedis)
+	defer func() {
+		if err := legacyEventDb.Close(); err != nil {
+			log.WithError(err).Error("failed to close events Redis client")
+		}
+	}()
+	legacyEventRepository := repository.NewLegacyRedisEventRepository(legacyEventDb, srv.config.EventRetention)
+
+	eventDb := redis.NewUniversalClient(&srv.config.EventsApiRedis)
+	defer func() {
+		if err := legacyEventDb.Close(); err != nil {
+			log.WithError(err).Error("failed to close events api Redis client")
+		}
+	}()
+	eventRepository := repository.NewEventRepository(eventDb)
+
+	pool, err := database.OpenPgxPool(srv.config.Postgres)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	srv.pool = pool
+
+	pulsarCompressionType, err := pulsarutils.ParsePulsarCompressionType(srv.config.Pulsar.CompressionType)
+	if err != nil {
+		return err
+	}
+	srv.pulsarCompressionType = pulsarCompressionType
+	pulsarCompressionLevel, err := pulsarutils.ParsePulsarCompressionLevel(srv.config.Pulsar.CompressionLevel)
+	if err != nil {
+		return err
+	}
+	srv.pulsarCompressionLevel = pulsarCompressionLevel
+
+	pulsarClient, err := pulsarutils.NewPulsarClient(&srv.config.Pulsar)
+	if err != nil {
+		return err
+	}
+	defer pulsarClient.Close()
+	srv.pulsarClient = pulsarClient
+
+	// TODO: Should be initialised in the submit server setup.
+	submitChecker := scheduler.NewSubmitChecker(
+		10*time.Minute,
+		config.Scheduling.Preemption.PriorityClasses,
+		config.Scheduling.GangIdAnnotation,
+	)
+
+	// Allows for registering functions to be run periodically in the background.
+	// TODO: Deprecate in favour of services + distributed tracing.
+	taskManager := task.NewBackgroundTaskManager(metrics.MetricPrefix)
+	defer taskManager.StopAll(time.Second * 2)
+	taskManager.Register(queueCache.Refresh, config.Metrics.RefreshInterval, "refresh_queue_cache")
+	taskManager.Register(leaseManager.ExpireLeases, config.Scheduling.Lease.ExpiryLoopInterval, "lease_expiry")
+
+	metrics.ExposeDataMetrics(queueRepository, jobRepository, usageRepository, schedulingInfoRepository, queueCache)
+
+	api.RegisterSubmitServer(grpcServer, submitServerToRegister)
+	api.RegisterUsageServer(grpcServer, usageServer)
+	api.RegisterEventServer(grpcServer, eventServer)
+	if aggregatedQueueServer.SchedulingReportsRepository != nil {
+		schedulerobjects.RegisterSchedulerReportingServer(
+			grpcServer,
+			aggregatedQueueServer.SchedulingReportsRepository,
+		)
+	}
+
+	api.RegisterAggregatedQueueServer(grpcServer, aggregatedQueueServer)
+	grpc_prometheus.Register(grpcServer)
+
+	// Cancel the errgroup if grpcServer.Serve returns an error.
+	log.Infof("Armada gRPC server listening on %d", config.GrpcPort)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.GrpcPort))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+func validateConfig(config configuration.ArmadaConfig) error {
+	if err := validateCancelJobsBatchSizeConfig(&config); err != nil {
+		return err
+	}
+	if err := validatePreemptionConfig(config.Scheduling.Preemption); err != nil {
+		return err
+	}
+	return nil
+}
+
+// func (srv *Server) postgres(ctx context.Context) error {
+// 	// TODO: Require postgres.
+// 	if len(srv.config.Postgres.Connection) == 0 {
+// 		return nil
+// 	}
+
+// 	pool, err := database.OpenPgxPool(srv.config.Postgres)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer pool.Close()
+// 	srv.pool = pool
+
+// 	select {
+// 	case <-ctx.Done():
+// 		return ctx.Err()
+// 	}
+// }
+
+// Submit-time job deduplication.
+func (srv *Server) SubmitDedupService(ctx context.Context) error {
+
+	// TODO: Should be with the submit endpoints.
+	if srv.pool == nil {
+		return errors.New("deduplication is enabled, but no postgres settings are provided")
+	}
+	log.Info("Pulsar submit API deduplication enabled")
+
+	// TODO: Make configurable.
+	store, err := pgkeyvalue.New(srv.pool, 1000000, srv.config.Pulsar.DedupTable)
+	if err != nil {
+		return err
+	}
+	pulsarSubmitServer.KVStore = store
+
+	// Automatically clean up keys after two weeks.
+	// TODO: Make configurable.
+	return store.PeriodicCleanup(ctx, time.Hour, 14*24*time.Hour)
+}
+
 func Serve(ctx context.Context, config *configuration.ArmadaConfig, healthChecks *health.MultiChecker) error {
 	log.Info("Armada server starting")
 	defer log.Info("Armada server shutting down")
@@ -96,21 +271,21 @@ func Serve(ctx context.Context, config *configuration.ArmadaConfig, healthChecks
 	})
 
 	// Setup Redis
-	db := createRedisClient(&config.Redis)
+	db := redis.NewUniversalClient(&config.Redis)
 	defer func() {
 		if err := db.Close(); err != nil {
 			log.WithError(err).Error("failed to close Redis client")
 		}
 	}()
 
-	legacyEventDb := createRedisClient(&config.EventsRedis)
+	legacyEventDb := redis.NewUniversalClient(&config.EventsRedis)
 	defer func() {
 		if err := legacyEventDb.Close(); err != nil {
 			log.WithError(err).Error("failed to close events Redis client")
 		}
 	}()
 
-	eventDb := createRedisClient(&config.EventsApiRedis)
+	eventDb := redis.NewUniversalClient(&config.EventsApiRedis)
 	defer func() {
 		if err := legacyEventDb.Close(); err != nil {
 			log.WithError(err).Error("failed to close events api Redis client")
@@ -242,6 +417,7 @@ func Serve(ctx context.Context, config *configuration.ArmadaConfig, healthChecks
 	if err != nil {
 		return err
 	}
+
 	serverPulsarProducerName := fmt.Sprintf("armada-server-%s", serverId)
 	producer, err := pulsarClient.CreateProducer(pulsar.ProducerOptions{
 		Name:             serverPulsarProducerName,
@@ -394,10 +570,6 @@ func Serve(ctx context.Context, config *configuration.ArmadaConfig, healthChecks
 
 	startupCompleteCheck.MarkComplete()
 	return g.Wait()
-}
-
-func createRedisClient(config *redis.UniversalOptions) redis.UniversalClient {
-	return redis.NewUniversalClient(config)
 }
 
 // TODO: Is this all validation that needs to be done?

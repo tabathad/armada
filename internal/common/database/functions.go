@@ -30,7 +30,6 @@ func OpenPgxPool(config configuration.PostgresConfig) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = db.Ping(context.Background())
 	return db, err
 }
 
