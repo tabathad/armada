@@ -9,8 +9,8 @@ import (
 	"github.com/armadaproject/armada/internal/common/auth/configuration"
 )
 
-func ConfigureAuth(config configuration.AuthConfig) []authorization.AuthService {
-	authServices := []authorization.AuthService{}
+func ConfigureAuth(config configuration.AuthConfig) ([]authorization.AuthService, error) {
+	var authServices []authorization.AuthService
 
 	if len(config.BasicAuth.Users) > 0 {
 		authServices = append(authServices,
@@ -49,8 +49,8 @@ func ConfigureAuth(config configuration.AuthConfig) []authorization.AuthService 
 	}
 
 	if len(authServices) == 0 {
-		panic(errors.New("At least one auth method must be specified in config"))
+		return nil, errors.New("at least one auth method must be specified in config")
 	}
 
-	return authServices
+	return authServices, nil
 }

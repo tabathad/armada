@@ -91,7 +91,10 @@ func Run(config Configuration) error {
 	if err != nil {
 		return errors.Wrapf(err, "error creating pulsar producer for executor api")
 	}
-	authServices := auth.ConfigureAuth(config.Auth)
+	authServices, err := auth.ConfigureAuth(config.Auth)
+	if err != nil {
+		return errors.WithMessage(err, "error creating auth services")
+	}
 	grpcServer := grpcCommon.CreateGrpcServer(config.Grpc.KeepaliveParams, config.Grpc.KeepaliveEnforcementPolicy, authServices)
 	defer grpcServer.GracefulStop()
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.Grpc.Port))
