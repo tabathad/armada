@@ -30,6 +30,7 @@ func RootCmd() *cobra.Command {
 	cmd.AddCommand(
 		runCmd(),
 		migrateDbCmd(),
+		pruneDbCmd(),
 	)
 
 	return cmd
