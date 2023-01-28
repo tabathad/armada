@@ -5,7 +5,7 @@ application:
   submitConcurrencyLimit: 2
   updateConcurrencyLimit: 10
   deleteConcurrencyLimit: 2
-  useExecutorApi: false
+  useExecutorApi: true
 task:
   utilisationReportingInterval: 1s
   missingJobEventReconciliationInterval: 15s

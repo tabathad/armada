@@ -54,6 +54,7 @@ type EventSequencesWithIds struct {
 // exhausted and a Sink capable of exhausting these objects
 type IngestionPipeline[T HasPulsarMessageIds] struct {
 	pulsarConfig           configuration.PulsarConfig
+	msgFilter              func(message pulsar.Message) bool
 	metricsConfig          configuration.MetricsConfig
 	metrics                *commonmetrics.Metrics
 	pulsarSubscriptionName string
@@ -64,8 +65,13 @@ type IngestionPipeline[T HasPulsarMessageIds] struct {
 	consumer               pulsar.Consumer // for test purposes only
 }
 
+func NoFilter(_ pulsar.Message) bool {
+	return true
+}
+
 func NewIngestionPipeline[T HasPulsarMessageIds](
 	pulsarConfig configuration.PulsarConfig,
+	msgFilter func(message pulsar.Message) bool,
 	pulsarSubscriptionName string,
 	pulsarBatchSize int,
 	pulsarBatchDuration time.Duration,
@@ -78,6 +84,7 @@ func NewIngestionPipeline[T HasPulsarMessageIds](
 		pulsarConfig:           pulsarConfig,
 		metricsConfig:          metricsConfig,
 		metrics:                metrics,
+		msgFilter:              msgFilter,
 		pulsarSubscriptionName: pulsarSubscriptionName,
 		pulsarBatchSize:        pulsarBatchSize,
 		pulsarBatchDuration:    pulsarBatchDuration,
@@ -103,7 +110,13 @@ func (ingester *IngestionPipeline[T]) Run(ctx context.Context) error {
 		ingester.consumer = consumer
 		defer closePulsar()
 	}
-	pulsarMsgs := pulsarutils.Receive(ctx, ingester.consumer, ingester.pulsarConfig.ReceiveTimeout, ingester.pulsarConfig.BackoffTime, ingester.metrics)
+	pulsarMsgs := pulsarutils.Receive(
+		ctx,
+		ingester.consumer,
+		ingester.msgFilter,
+		ingester.pulsarConfig.ReceiveTimeout,
+		ingester.pulsarConfig.BackoffTime,
+		ingester.metrics)
 
 	// Setup a context that n seconds after ctx
 	// This gives the rest of the pipeline a chance to flush pending messages

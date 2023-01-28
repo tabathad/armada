@@ -13,8 +13,8 @@ import "github.com/apache/pulsar-client-go/pulsar"
 const PULSAR_MESSAGE_TYPE_PROPERTY = "type"
 
 const (
-	PULSAR_UTILISATION_MESSAGE = "utilisation"
-	PULSAR_CONTROL_MESSAGE     = "control"
+	PULSAR_CONTROL_MESSAGE = "control"
+	PULSAR_SCHEDULER_NAME  = "pulsarSchedulerName"
 )
 
 // IsControlMessage returns true if msg is a control message, and false otherwise.

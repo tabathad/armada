@@ -148,21 +148,21 @@ func (srv *PulsarSubmitServer) SubmitJobs(ctx context.Context, req *api.JobSubmi
 
 	// Check if all jobs can be scheduled.
 	// This check uses the legacy resource reporting logic.
-	legacySchedulerJobs := selectApiJobsForLegacyScheduler(apiJobs)
-	if len(legacySchedulerJobs) > 0 {
-		allClusterSchedulingInfo, err := srv.SubmitServer.schedulingInfoRepository.GetClusterSchedulingInfo()
-		if err != nil {
-			err = errors.WithMessage(err, "error getting scheduling info")
-			return nil, err
-		}
-		if ok, err := validateJobsCanBeScheduled(legacySchedulerJobs, allClusterSchedulingInfo); !ok {
-			if err != nil {
-				return nil, errors.WithMessagef(err, "can't schedule job for user %s", userId)
-			} else {
-				return nil, errors.Errorf("can't schedule job for user %s", userId)
-			}
-		}
-	}
+	//legacySchedulerJobs := selectApiJobsForLegacyScheduler(apiJobs)
+	//if len(legacySchedulerJobs) > 0 {
+	//	allClusterSchedulingInfo, err := srv.SubmitServer.schedulingInfoRepository.GetClusterSchedulingInfo()
+	//	if err != nil {
+	//		err = errors.WithMessage(err, "error getting scheduling info")
+	//		return nil, err
+	//	}
+	//	if ok, err := validateJobsCanBeScheduled(legacySchedulerJobs, allClusterSchedulingInfo); !ok {
+	//		if err != nil {
+	//			return nil, errors.WithMessagef(err, "can't schedule job for user %s", userId)
+	//		} else {
+	//			return nil, errors.Errorf("can't schedule job for user %s", userId)
+	//		}
+	//	}
+	//}
 
 	// Check if all jobs can be scheduled.
 	// This check uses the NodeDb of the new scheduler and
@@ -736,7 +736,9 @@ func (srv *PulsarSubmitServer) publishToPulsar(ctx context.Context, sequences []
 	if err != nil {
 		return err
 	}
-	return pulsarutils.PublishSequences(ctx, srv.Producer, sequences)
+	return pulsarutils.PublishSequences(ctx, srv.Producer, sequences, map[string]string{
+		armadaevents.PULSAR_SCHEDULER_NAME: "pulsar",
+	})
 }
 
 // getOriginalJobIds returns the mapping between jobId and originalJobId.  If the job (or more specifically the clientId

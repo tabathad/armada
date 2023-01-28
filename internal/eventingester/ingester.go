@@ -52,8 +52,16 @@ func Run(config *configuration.EventIngesterConfiguration) {
 	}
 	converter := convert.NewEventConverter(compressor, uint(config.BatchSize), metrics)
 
-	ingester := ingest.
-		NewIngestionPipeline(config.Pulsar, config.SubscriptionName, config.BatchSize, config.BatchDuration, converter, eventDb, config.Metrics, metrics)
+	ingester := ingest.NewIngestionPipeline(
+		config.Pulsar,
+		ingest.NoFilter,
+		config.SubscriptionName,
+		config.BatchSize,
+		config.BatchDuration,
+		converter,
+		eventDb,
+		config.Metrics,
+		metrics)
 	err = ingester.Run(app.CreateContextWithShutdown())
 
 	if err != nil {

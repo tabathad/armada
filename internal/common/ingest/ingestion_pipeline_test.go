@@ -190,7 +190,7 @@ func newSimpleConverter(t *testing.T) InstructionConverter[*simpleMessages] {
 	return &simpleConverter{t}
 }
 
-func (s *simpleConverter) Convert(ctx context.Context, msg *EventSequencesWithIds) *simpleMessages {
+func (s *simpleConverter) Convert(_ context.Context, msg *EventSequencesWithIds) *simpleMessages {
 	s.t.Helper()
 	assert.Len(s.t, msg.EventSequences, len(msg.MessageIds))
 	var converted []*simpleMessage
@@ -284,6 +284,7 @@ func testPipeline(consumer pulsar.Consumer, converter InstructionConverter[*simp
 			ReceiveTimeout: 10 * time.Second,
 			BackoffTime:    time.Second,
 		},
+		msgFilter:              NoFilter,
 		pulsarSubscriptionName: "subscription",
 		pulsarBatchDuration:    batchDuration,
 		pulsarBatchSize:        batchSize,

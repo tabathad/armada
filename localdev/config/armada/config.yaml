@@ -1,5 +1,5 @@
 grpcPort: 50051
-httpPort: 8080
+httpPort: 8081
 metricsPort: 9000
 priorityHalfTime: 20m
 cancelJobsBatchSize: 1000
@@ -36,9 +36,9 @@ redis:
   poolSize: 1000
 eventsApiRedis:
   addrs:
-    - "redis:6379"
+    - "localhost:6379"
   password: ""
-  db: 1
+  db: 2
   poolSize: 1000
 pulsar:
   URL: "pulsar://pulsar:6650"

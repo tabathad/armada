@@ -84,6 +84,7 @@ func (p *PulsarPublisher) PublishMessages(ctx context.Context, events []*armadae
 			Payload: bytes,
 			Properties: map[string]string{
 				armadaevents.PULSAR_MESSAGE_TYPE_PROPERTY: armadaevents.PULSAR_CONTROL_MESSAGE,
+				armadaevents.PULSAR_SCHEDULER_NAME:        "pulsar",
 			},
 			Key: sequences[i].JobSetName,
 		}

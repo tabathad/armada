@@ -2,6 +2,7 @@ package pulsarutils
 
 import (
 	"context"
+	"golang.org/x/exp/maps"
 	"sync/atomic"
 
 	"github.com/apache/pulsar-client-go/pulsar"
@@ -16,7 +17,7 @@ import (
 
 // CompactAndPublishSequences reduces the number of sequences to the smallest possible,
 // while respecting per-job set ordering and max Pulsar message size, and then publishes to Pulsar.
-func CompactAndPublishSequences(ctx context.Context, sequences []*armadaevents.EventSequence, producer pulsar.Producer, maxMessageSizeInBytes uint) error {
+func CompactAndPublishSequences(ctx context.Context, sequences []*armadaevents.EventSequence, producer pulsar.Producer, maxMessageSizeInBytes uint, overrideProperties map[string]string) error {
 	// Reduce the number of sequences to send to the minimum possible,
 	// and then break up any sequences larger than maxMessageSizeInBytes.
 	sequences = eventutil.CompactEventSequences(sequences)
@@ -24,7 +25,7 @@ func CompactAndPublishSequences(ctx context.Context, sequences []*armadaevents.E
 	if err != nil {
 		return err
 	}
-	return PublishSequences(ctx, producer, sequences)
+	return PublishSequences(ctx, producer, sequences, overrideProperties)
 }
 
 // PublishSequence publishes several event sequences to Pulsar.
@@ -36,7 +37,7 @@ func CompactAndPublishSequences(ctx context.Context, sequences []*armadaevents.E
 // and
 // eventutil.LimitSequencesByteSize(sequences, int(srv.MaxAllowedMessageSize))
 // before passing to this function.
-func PublishSequences(ctx context.Context, producer pulsar.Producer, sequences []*armadaevents.EventSequence) error {
+func PublishSequences(ctx context.Context, producer pulsar.Producer, sequences []*armadaevents.EventSequence, overrideProperties map[string]string) error {
 	// Incoming gRPC requests are annotated with a unique id.
 	// Pass this id through the log by adding it to the Pulsar message properties.
 	requestId := requestid.FromContextOrMissing(ctx)
@@ -56,6 +57,12 @@ func PublishSequences(ctx context.Context, producer pulsar.Producer, sequences [
 		payloads[i] = payload
 	}
 
+	msgProperties := map[string]string{
+		requestid.MetadataKey:                     requestId,
+		armadaevents.PULSAR_MESSAGE_TYPE_PROPERTY: armadaevents.PULSAR_CONTROL_MESSAGE,
+	}
+	maps.Copy(msgProperties, overrideProperties)
+
 	// Then, send all sequences concurrently (while respecting order),
 	// using Pulsar async send. Collect any errors via ch.
 	// ch must be buffered to avoid sending on ch blocking,
@@ -66,12 +73,9 @@ func PublishSequences(ctx context.Context, producer pulsar.Producer, sequences [
 		producer.SendAsync(
 			ctx,
 			&pulsar.ProducerMessage{
-				Payload: payloads[i],
-				Properties: map[string]string{
-					requestid.MetadataKey:                     requestId,
-					armadaevents.PULSAR_MESSAGE_TYPE_PROPERTY: armadaevents.PULSAR_CONTROL_MESSAGE,
-				},
-				Key: sequences[i].JobSetName,
+				Payload:    payloads[i],
+				Properties: msgProperties,
+				Key:        sequences[i].JobSetName,
 			},
 			// Callback on send.
 			func(_ pulsar.MessageID, _ *pulsar.ProducerMessage, err error) {

@@ -37,6 +37,7 @@ var log = logrus.NewEntry(logrus.StandardLogger())
 func Receive(
 	ctx context.Context,
 	consumer pulsar.Consumer,
+	msgFilter func(message pulsar.Message) bool,
 	receiveTimeout time.Duration,
 	backoffTime time.Duration,
 	m *commonmetrics.Metrics,
@@ -96,9 +97,11 @@ func Receive(
 				}
 
 				numReceived++
-				lastPublishTime = msg.PublishTime()
-				lastMessageId = msg.ID()
-				out <- msg
+				if msgFilter(msg) {
+					lastPublishTime = msg.PublishTime()
+					lastMessageId = msg.ID()
+					out <- msg
+				}
 			}
 		}
 	}()
