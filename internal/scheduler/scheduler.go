@@ -263,15 +263,16 @@ func (s *Scheduler) syncState(ctx context.Context) ([]*SchedulerJob, error) {
 			if err != nil {
 				return nil, errors.Wrapf(err, "error retrieving job %s from jobDb ", jobId)
 			}
+
+			// If the job is nil at this point then it cannot be active.
+			// In this case we can ignore the run
+			if job == nil {
+				log.Debugf("Job %s is not an active job. Ignoring update for run %s", jobId, dbRun.RunID)
+				continue
+			}
+
 			job = job.DeepCopy()
 			jobsToUpdateById[jobId] = job
-		}
-
-		// If the job is nil at this point then it cannot be active.
-		// In this case we can ignore the run
-		if job == nil {
-			log.Debugf("Job %s is not an active job. Ignoring update for run %s", jobId, dbRun.RunID)
-			continue
 		}
 
 		returnProcessed := false
