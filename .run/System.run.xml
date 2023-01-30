@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="System" type="CompoundRunConfigurationType">
+    <toRun name="API" type="GoApplicationRunConfiguration" />
+    <toRun name="Event Ingester" type="GoApplicationRunConfiguration" />
+    <toRun name="Executor" type="GoApplicationRunConfiguration" />
+    <toRun name="Scheduler" type="GoApplicationRunConfiguration" />
+    <toRun name="Scheduler Ingester" type="GoApplicationRunConfiguration" />
+    <method v="2" />
+  </configuration>
+</component>

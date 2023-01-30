@@ -1,0 +1,19 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="API" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="armada" />
+    <working_directory value="$PROJECT_DIR$" />
+    <parameters value="--config localdev/config/armada/config.yaml" />
+    <envs>
+      <env name="ARMADA_EVENTS_API_REDIS_ADDRS" value="localhost:6379" />
+      <env name="ARMADA_POSTGRES_CONNECTION_HOST" value="localhost" />
+      <env name="ARMADA_PULSAR_URL" value="pulsar://localhost:6650" />
+      <env name="ARMADA_REDIS_ADDRS" value="localhost:6379" />
+      <env name="ARMADA_HTTP_PORT" value="8081" />
+    </envs>
+    <kind value="FILE" />
+    <package value="github.com/armadaproject/armada" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/cmd/armada/main.go" />
+    <method v="2" />
+  </configuration>
+</component>
