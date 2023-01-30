@@ -145,6 +145,7 @@ func (p *PulsarPublisher) PublishMarkers(ctx context.Context, groupId uuid.UUID)
 		msg := &pulsar.ProducerMessage{
 			Properties: map[string]string{
 				armadaevents.PULSAR_MESSAGE_TYPE_PROPERTY: armadaevents.PULSAR_CONTROL_MESSAGE,
+				armadaevents.PULSAR_SCHEDULER_NAME:        "pulsar",
 				explicitPartitionKey:                      fmt.Sprintf("%d", i),
 			},
 			Payload: bytes,
