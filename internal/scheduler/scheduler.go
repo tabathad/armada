@@ -278,6 +278,8 @@ func (s *Scheduler) syncState(ctx context.Context) ([]*SchedulerJob, error) {
 		run := job.RunById(dbRun.RunID)
 		if run == nil {
 			run = s.createSchedulerRun(&dbRun)
+			// TODO: we need to ensure that runs end up in the correct order here
+			// This will need us to store an order id in the db
 			job.Runs = append(job.Runs, run)
 		} else {
 			returnProcessed = run.Returned
@@ -290,8 +292,6 @@ func (s *Scheduler) syncState(ctx context.Context) ([]*SchedulerJob, error) {
 		// do the same, but eventually we should send an actual queued message and this bit of code can disappear
 		if !returnProcessed && run.Returned && job.NumReturned() <= s.maxLeaseReturns {
 			job.Queued = true
-			job.Node = ""
-			job.Executor = ""
 			run.Failed = false // unset failed here so that we don't generate a job failed message later
 		}
 	}
@@ -299,11 +299,7 @@ func (s *Scheduler) syncState(ctx context.Context) ([]*SchedulerJob, error) {
 	// any jobs that have don't have active run need to be marked as queued
 	for _, job := range jobsToUpdateById {
 		run := job.CurrentRun()
-		if run == nil || run.InTerminalState() {
-			job.Queued = true
-			job.Node = ""
-			job.Executor = ""
-		}
+		job.Queued = run == nil || run.InTerminalState()
 	}
 
 	jobsToUpdate := maps.Values(jobsToUpdateById)
@@ -343,7 +339,7 @@ func (s *Scheduler) generateLeaseMessages(scheduledJobs []*SchedulerJob) ([]*arm
 						JobRunLeased: &armadaevents.JobRunLeased{
 							RunId:      armadaevents.ProtoUuidFromUuid(job.CurrentRun().RunID),
 							JobId:      jobId,
-							ExecutorId: job.Executor,
+							ExecutorId: job.CurrentRun().Executor,
 						},
 					},
 				},

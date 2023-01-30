@@ -2,6 +2,7 @@ package job
 
 import (
 	"fmt"
+	"github.com/armadaproject/armada/pkg/armadaevents"
 	"regexp"
 	"sync"
 
@@ -65,8 +66,10 @@ func (submitService *SubmitService) SubmitExecutorApiJobs(jobsToSubmit []*execut
 	for _, jobToSubmit := range jobsToSubmit {
 		submitJob, err := CreateSubmitJobFromExecutorApiJobRunLease(jobToSubmit, submitService.podDefaults)
 		if err != nil {
+			jobIdString, _ := armadaevents.UlidStringFromProtoUuid(jobToSubmit.Job.JobId)
+			// TODO: fix error
 			failedSubmissions = append(failedSubmissions, &FailedSubmissionDetails{
-				JobId: jobToSubmit.Job.JobId.String(),
+				JobId: jobIdString,
 				// TODO work out how to handle that we have no pod - especially in downstream funcs
 				Pod:         nil,
 				Recoverable: false,

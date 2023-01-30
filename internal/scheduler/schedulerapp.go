@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"fmt"
+	"github.com/armadaproject/armada/internal/armada/configuration"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"net"
@@ -108,7 +109,11 @@ func Run(config Configuration) error {
 	if err != nil {
 		return errors.WithMessage(err, "error setting up grpc server")
 	}
-	executorServer := NewExecutorApi(apiProducer, jobRepository, executorRepository, []int32{}, config.Scheduling.MaximumJobsToSchedule)
+	allowedPcs := allowedPrioritiesFromPriorityClasses(config.Scheduling.Preemption.PriorityClasses)
+	executorServer, err := NewExecutorApi(apiProducer, jobRepository, executorRepository, allowedPcs, config.Scheduling.MaximumJobsToSchedule)
+	if err != nil {
+		return errors.WithMessage(err, "error creating executorApi")
+	}
 	executorapi.RegisterExecutorApiServer(grpcServer, executorServer)
 	services = append(services, func() error {
 		log.Infof("Executor api listening on %s", lis.Addr())
@@ -166,4 +171,12 @@ func createLeaderController(config LeaderConfig) (LeaderController, error) {
 	default:
 		return nil, errors.Errorf("%s is not a value leader mode", config.Mode)
 	}
+}
+
+func allowedPrioritiesFromPriorityClasses(pcs map[string]configuration.PriorityClass) []int32 {
+	allowedPcs := make([]int32, 0, len(pcs))
+	for _, v := range pcs {
+		allowedPcs = append(allowedPcs, v.Priority)
+	}
+	return allowedPcs
 }
