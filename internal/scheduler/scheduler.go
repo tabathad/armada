@@ -608,7 +608,7 @@ func (s *Scheduler) ensureDbUpToDate(ctx context.Context, pollInterval time.Dura
 				log.Infof("Successfully ensured that database state is up to date")
 				return nil
 			}
-			log.Infof("Recevied %d partitions, still waiting on  %d", numSent, numSent-numReceived)
+			log.Infof("Recevied %d partitions, still waiting on  %d", numReceived, numSent-numReceived)
 			s.clock.Sleep(pollInterval)
 		}
 	}
