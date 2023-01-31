@@ -1,17 +1,9 @@
 package scheduleringester
 
 import (
-	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/armadaproject/armada/pkg/armadaevents"
 	"time"
 
-	"github.com/armadaproject/armada/internal/common/compress"
-
-	"github.com/armadaproject/armada/internal/common/database"
-
-	"github.com/armadaproject/armada/internal/common/ingest/metrics"
-	"github.com/armadaproject/armada/pkg/armadaevents"
-
+	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
