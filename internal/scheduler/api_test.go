@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/clock"
 
 	"github.com/armadaproject/armada/internal/common/compress"
@@ -47,11 +48,18 @@ func TestExecutorApi_LeaseJobRuns(t *testing.T) {
 		Pool: "test-pool",
 		Nodes: []*schedulerobjects.Node{
 			{
-				Id:                               "test-executor-test-node",
-				TotalResources:                   schedulerobjects.ResourceList{},
-				JobRuns:                          []string{runId1.String(), runId2.String()},
-				AllocatableByPriorityAndResource: map[int32]schedulerobjects.ResourceList{},
-				LastSeen:                         testClock.Now().UTC(),
+				Id:             "test-executor-test-node",
+				TotalResources: schedulerobjects.ResourceList{},
+				JobRuns:        []string{runId1.String(), runId2.String()},
+				AllocatableByPriorityAndResource: map[int32]schedulerobjects.ResourceList{
+					1000: {
+						Resources: map[string]resource.Quantity{},
+					},
+					2000: {
+						Resources: map[string]resource.Quantity{},
+					},
+				},
+				LastSeen: testClock.Now().UTC(),
 			},
 		},
 		MinimumJobSize:    schedulerobjects.ResourceList{},
@@ -144,7 +152,7 @@ func TestExecutorApi_LeaseJobRuns(t *testing.T) {
 				mockPulsarProducer,
 				mockJobRepository,
 				mockExecutorRepository,
-				[]int32{},
+				[]int32{1000, 2000},
 				maxJobsPerCall,
 			)
 			require.NoError(t, err)
@@ -214,7 +222,7 @@ func TestExecutorApi_Publish(t *testing.T) {
 				mockPulsarProducer,
 				mockJobRepository,
 				mockExecutorRepository,
-				[]int32{},
+				[]int32{1000, 2000},
 				100,
 			)
 

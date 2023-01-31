@@ -2,7 +2,8 @@ package auth
 
 import (
 	"context"
-	"errors"
+
+	"github.com/pkg/errors"
 
 	"github.com/armadaproject/armada/internal/common/auth/authorization"
 	"github.com/armadaproject/armada/internal/common/auth/authorization/groups"
@@ -25,7 +26,7 @@ func ConfigureAuth(config configuration.AuthConfig) ([]authorization.AuthService
 	if config.OpenIdAuth.ProviderUrl != "" {
 		openIdAuthService, err := authorization.NewOpenIdAuthServiceForProvider(context.Background(), &config.OpenIdAuth)
 		if err != nil {
-			panic(err)
+			return nil, errors.WithMessage(err, "error initialising openId auth")
 		}
 		authServices = append(authServices, openIdAuthService)
 	}
@@ -43,7 +44,7 @@ func ConfigureAuth(config configuration.AuthConfig) ([]authorization.AuthService
 
 		kerberosAuthService, err := authorization.NewKerberosAuthService(&config.Kerberos, groupLookup)
 		if err != nil {
-			panic(err)
+			return nil, errors.WithMessage(err, "error initialising kerberos auth")
 		}
 		authServices = append(authServices, kerberosAuthService)
 	}
