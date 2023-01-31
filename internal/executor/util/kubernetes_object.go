@@ -242,7 +242,13 @@ func CreatePodFromExecutorApiJob(job *executorapi.JobRunLease, defaults *configu
 
 	// TODO: handle the errors here
 	jobId, err := armadaevents.UlidStringFromProtoUuid(job.Job.JobId)
+	if err != nil {
+		panic(err)
+	}
 	runId, err := armadaevents.UuidStringFromProtoUuid(job.JobRunId)
+	if err != nil {
+		panic(err)
+	}
 
 	labels := util.MergeMaps(job.Job.ObjectMeta.Labels, map[string]string{
 		domain.JobId:     jobId,
