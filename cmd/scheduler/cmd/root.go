@@ -19,6 +19,7 @@ func RootCmd() *cobra.Command {
 		SilenceUsage: true,
 		Short:        "The main armada scheduler",
 	}
+
 	cmd.PersistentFlags().StringSlice(
 		CustomConfigLocation,
 		[]string{},
