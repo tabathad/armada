@@ -2,7 +2,6 @@ package job
 
 import (
 	"fmt"
-	"github.com/armadaproject/armada/pkg/armadaevents"
 	"regexp"
 	"sync"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/armadaproject/armada/internal/executor/domain"
 	util2 "github.com/armadaproject/armada/internal/executor/util"
 	"github.com/armadaproject/armada/pkg/api"
+	"github.com/armadaproject/armada/pkg/armadaevents"
 	"github.com/armadaproject/armada/pkg/executorapi"
 )
 
@@ -131,7 +131,6 @@ func (submitService *SubmitService) submitWorker(wg *sync.WaitGroup, jobsToSubmi
 
 			// remove just created pods
 			submitService.clusterContext.DeletePods(jobPods)
-			break
 		}
 	}
 }

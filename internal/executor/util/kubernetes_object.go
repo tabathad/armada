@@ -252,12 +252,12 @@ func CreatePodFromExecutorApiJob(job *executorapi.JobRunLease, defaults *configu
 
 	labels := util.MergeMaps(job.Job.ObjectMeta.Labels, map[string]string{
 		domain.JobId:     jobId,
+		domain.JobRunId:  runId,
 		domain.Queue:     job.Queue,
 		domain.PodNumber: strconv.Itoa(0),
 		domain.PodCount:  strconv.Itoa(1),
 	})
 	annotation := util.MergeMaps(job.Job.ObjectMeta.Annotations, map[string]string{
-		domain.JobRunId: runId,
 		domain.JobSetId: job.Jobset,
 		domain.Owner:    job.User,
 	})
