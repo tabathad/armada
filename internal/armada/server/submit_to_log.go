@@ -692,7 +692,7 @@ func (srv *PulsarSubmitServer) assignScheduler(jobs []*api.Job) (map[string]sche
 
 	// when assigning jobs to a scheduler, all the jobs in a gang have to go on the same scheduler
 	groups := groupJobsByAnnotation(srv.GangIdAnnotation, jobs)
-	schedulers := make(map[string]schedulers.Scheduler, len(jobs))
+	assignedSchedulers := make(map[string]schedulers.Scheduler, len(jobs))
 	for _, group := range groups {
 		schedulableOnLegacyScheduler, legacyMsg := srv.LegacySchedulerSubmitChecker.CheckApiJobs(group)
 		schedulableOnPulsarScheduler := false
@@ -726,10 +726,10 @@ func (srv *PulsarSubmitServer) assignScheduler(jobs []*api.Job) (map[string]sche
 			assignedScheduler = schedulers.Legacy
 		}
 		for _, job := range group {
-			schedulers[job.Id] = assignedScheduler
+			assignedSchedulers[job.Id] = assignedScheduler
 		}
 	}
-	return schedulers, nil
+	return assignedSchedulers, nil
 }
 
 func groupJobsByAnnotation(annotation string, jobs []*api.Job) [][]*api.Job {
