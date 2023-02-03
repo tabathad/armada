@@ -121,10 +121,6 @@ func (srv *SubmitFromLog) Run(ctx context.Context) error {
 			lastPublishTime = msg.PublishTime()
 			numReceived++
 
-			if msg.Properties()[armadaevents.PULSAR_SCHEDULER_NAME] != "" {
-				break
-			}
-
 			// Incoming gRPC requests are annotated with a unique id,
 			// which is included with the corresponding Pulsar message.
 			requestId := pulsarrequestid.FromMessageOrMissing(msg)

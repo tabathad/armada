@@ -54,7 +54,6 @@ func Run(config *configuration.EventIngesterConfiguration) {
 
 	ingester := ingest.NewIngestionPipeline(
 		config.Pulsar,
-		ingest.NoFilter,
 		config.SubscriptionName,
 		config.BatchSize,
 		config.BatchDuration,
