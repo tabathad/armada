@@ -69,7 +69,7 @@ func (srv *SubmitChecker) updateExecutors(ctx context.Context) {
 	for _, executor := range executors {
 		nodeDb, err := srv.constructNodeDb(executor.Nodes)
 		err = nodeDb.ClearAllocated()
-		if err != nil {
+		if err == nil {
 			srv.mu.Lock()
 			srv.nodeDbByExecutor[executor.Id] = nodeDb
 			srv.mu.Unlock()

@@ -6,8 +6,8 @@ corsAllowedOrigins:
   - http://localhost:8089
   - http://localhost:10000
 cancelJobsBatchSize: 1000
-pulsarSchedulerEnabled: false
-probabilityOfUsingPulsarScheduler: 0
+pulsarSchedulerEnabled: true
+probabilityOfUsingPulsarScheduler: 100
 grpc:
   keepaliveParams:
     maxConnectionIdle: 5m
