@@ -1,9 +1,9 @@
 package scheduleringester
 
 import (
+	"github.com/armadaproject/armada/internal/common/schedulers"
 	"time"
 
-	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -12,7 +12,6 @@ import (
 	"github.com/armadaproject/armada/internal/common/database"
 	"github.com/armadaproject/armada/internal/common/ingest"
 	"github.com/armadaproject/armada/internal/common/ingest/metrics"
-	"github.com/armadaproject/armada/pkg/armadaevents"
 )
 
 // Run will create a pipeline that will take Armada event messages from Pulsar and update the
@@ -27,23 +26,18 @@ func Run(config Configuration) {
 	}
 	schedulerDb := NewSchedulerDb(db, svcMetrics, 100*time.Millisecond, 60*time.Second)
 
-	// Discard submit job messages not intended for this scheduler.
-	msgFilter := func(msg pulsar.Message) bool {
-		return msg.Properties()[armadaevents.PULSAR_SCHEDULER_NAME] == "pulsar"
-	}
-
 	compressor, err := compress.NewZlibCompressor(1024)
 	if err != nil {
 		panic(errors.WithMessage(err, "Error creating  compressor"))
 	}
 	converter := NewInstructionConverter(svcMetrics, config.PriorityClasses, compressor)
 
-	ingester := ingest.NewIngestionPipeline(
+	ingester := ingest.NewFilteredMsgIngestionPipeline(
 		config.Pulsar,
-		msgFilter,
 		config.SubscriptionName,
 		config.BatchSize,
 		config.BatchDuration,
+		schedulers.ForPulsarScheduler,
 		converter,
 		schedulerDb,
 		config.Metrics,

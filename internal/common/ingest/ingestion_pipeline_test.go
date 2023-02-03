@@ -217,7 +217,7 @@ func newSimpleSink(t *testing.T) *simpleSink {
 	}
 }
 
-func (s *simpleSink) Store(ctx context.Context, msg *simpleMessages) error {
+func (s *simpleSink) Store(_ context.Context, msg *simpleMessages) error {
 	for _, simpleMessage := range msg.msgs {
 		s.simpleMessages[simpleMessage.id] = simpleMessage
 	}
@@ -293,11 +293,12 @@ func testPipeline(consumer pulsar.Consumer, converter InstructionConverter[*simp
 		metricsConfig:          configuration.MetricsConfig{},
 		metrics:                testMetrics,
 		consumer:               consumer,
+		msgFilter:              func(msg pulsar.Message) bool { return true },
 	}
 }
 
-func marshal(t *testing.T, eventSequence *armadaevents.EventSequence) []byte {
-	payload, err := proto.Marshal(succeeded)
+func marshal(t *testing.T, es *armadaevents.EventSequence) []byte {
+	payload, err := proto.Marshal(es)
 	assert.NoError(t, err)
 	return payload
 }
