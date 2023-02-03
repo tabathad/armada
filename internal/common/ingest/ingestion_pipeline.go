@@ -135,7 +135,6 @@ func (ingester *IngestionPipeline[T]) Run(ctx context.Context) error {
 	pulsarMsgs := pulsarutils.Receive(
 		ctx,
 		ingester.consumer,
-		ingester.msgFilter,
 		ingester.pulsarConfig.ReceiveTimeout,
 		ingester.pulsarConfig.BackoffTime,
 		ingester.metrics)
