@@ -91,6 +91,7 @@ func (l *LegacySchedulingAlgo) Schedule(ctx context.Context, txn *memdb.Txn, job
 	priorityFactorByQueue := make(map[string]float64)
 	for _, queue := range queues {
 		priorityFactorByQueue[queue.Name] = queue.Weight
+		priorityFactorByQueue[queue.Name] = queue.Weight
 	}
 
 	// Get the total capacity available across all executors.

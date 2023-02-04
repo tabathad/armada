@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -132,7 +133,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 			// a partial publish and consequently an inconsistent state.  Once the Pulsar client supports transactions
 			// we should be able to remove this limitation
 			if err != nil {
-				log.WithError(err).Error("Error in scheduling cycle")
+				log.WithField("stack", fmt.Sprintf("%+v", err)).WithError(err).Error("Error in scheduling cycle")
 				leaderToken = InvalidLeaderToken()
 			}
 			taken := s.clock.Now().Sub(start)

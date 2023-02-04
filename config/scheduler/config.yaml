@@ -1,4 +1,4 @@
-cyclePeriod: 10s
+cyclePeriod: 1s
 executorTimeout: 1h
 databaseFetchSize: 1000
 pulsarSendTimeout: 5s
@@ -46,6 +46,11 @@ scheduling:
           cpu: 0.99
       armada-preemptible:
         priority: 900
+        maximalResourceFractionPerQueue:
+          memory: 0.99
+          cpu: 0.99
+      armada-zero:
+        priority: 0
         maximalResourceFractionPerQueue:
           memory: 0.99
           cpu: 0.99

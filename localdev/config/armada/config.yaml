@@ -38,7 +38,7 @@ eventsApiRedis:
   addrs:
     - "localhost:6379"
   password: ""
-  db: 2
+  db: 1
   poolSize: 1000
 pulsar:
   URL: "pulsar://pulsar:6650"

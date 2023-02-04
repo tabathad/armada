@@ -2,7 +2,7 @@
   <configuration default="false" name="Submit" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="armada" />
     <working_directory value="$PROJECT_DIR$" />
-    <parameters value="submit job.yaml" />
+    <parameters value="create queue e2e-test-queue" />
     <kind value="FILE" />
     <package value="github.com/armadaproject/armada" />
     <directory value="$PROJECT_DIR$" />
