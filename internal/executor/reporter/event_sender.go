@@ -121,6 +121,8 @@ func filterJobRunEvents(events []*armadaevents.EventSequence_Event) []*armadaeve
 			result = append(result, event)
 		case *armadaevents.EventSequence_Event_JobRunPreempted:
 			result = append(result, event)
+		case *armadaevents.EventSequence_Event_StandaloneIngressInfo:
+			result = append(result, event)
 		case *armadaevents.EventSequence_Event_ResourceUtilisation:
 			result = append(result, event)
 		default:
@@ -143,6 +145,8 @@ func populateRunId(eventSequence *armadaevents.EventSequence, jobRunId *armadaev
 			runEvent.JobRunErrors.RunId = jobRunId
 		case *armadaevents.EventSequence_Event_JobRunPreempted:
 			runEvent.JobRunPreempted.PreemptedRunId = jobRunId
+		case *armadaevents.EventSequence_Event_StandaloneIngressInfo:
+			runEvent.StandaloneIngressInfo.JobId = jobRunId
 		case *armadaevents.EventSequence_Event_ResourceUtilisation:
 			runEvent.ResourceUtilisation.JobId = jobRunId
 		default:

@@ -48,6 +48,10 @@ func TestSendEvents_OnlySendsJobRunEvents(t *testing.T) {
 			event:                  &api.JobPreemptedEvent{JobId: util.ULID().String(), RunId: uuid.New().String(), PreemptiveRunId: uuid.New().String()},
 			expectedNumberOfEvents: 1,
 		},
+		"JobIngressInfoEvent": {
+			event:                  &api.JobIngressInfoEvent{JobId: util.ULID().String(), KubernetesId: uuid.New().String()},
+			expectedNumberOfEvents: 1,
+		},
 		"JobUtilisationEvent": {
 			event:                  &api.JobUtilisationEvent{JobId: util.ULID().String(), KubernetesId: uuid.New().String()},
 			expectedNumberOfEvents: 1,
