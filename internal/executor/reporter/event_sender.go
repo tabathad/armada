@@ -146,9 +146,9 @@ func populateRunId(eventSequence *armadaevents.EventSequence, jobRunId *armadaev
 		case *armadaevents.EventSequence_Event_JobRunPreempted:
 			runEvent.JobRunPreempted.PreemptedRunId = jobRunId
 		case *armadaevents.EventSequence_Event_StandaloneIngressInfo:
-			runEvent.StandaloneIngressInfo.JobId = jobRunId
+			runEvent.StandaloneIngressInfo.RunId = jobRunId
 		case *armadaevents.EventSequence_Event_ResourceUtilisation:
-			runEvent.ResourceUtilisation.JobId = jobRunId
+			runEvent.ResourceUtilisation.RunId = jobRunId
 		default:
 			log.Warnf("unexpected event type %T- failed to populate run id", runEvent)
 		}
