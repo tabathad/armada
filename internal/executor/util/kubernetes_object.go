@@ -228,6 +228,7 @@ func ExtractServices(job *executorapi.JobRunLease, pod *v1.Pod) []*v1.Service {
 				domain.Queue:     pod.Labels[domain.Queue],
 				domain.PodNumber: pod.Labels[domain.PodNumber],
 			}
+			result = append(result, service)
 		}
 	}
 
