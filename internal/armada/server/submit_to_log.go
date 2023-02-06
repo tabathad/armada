@@ -57,8 +57,10 @@ type PulsarSubmitServer struct {
 	PulsarSchedulerEnabled bool
 	// Probability of using the pulsar scheduler.  Has no effect if PulsarSchedulerEnabled is false
 	ProbabilityOdfUsingPulsarScheduler float64
-	Rand                               *rand.Rand
-	GangIdAnnotation                   string
+	// Used to assign a job to either legacy or pulsar schedulers. Injected here to allow repeatable tests
+	Rand *rand.Rand
+	// Gang id annotation. Needed because we cannot split a gang across schedulers.
+	GangIdAnnotation string
 }
 
 func (srv *PulsarSubmitServer) SubmitJobs(ctx context.Context, req *api.JobSubmitRequest) (*api.JobSubmitResponse, error) {
@@ -257,22 +259,23 @@ func (srv *PulsarSubmitServer) CancelJobs(ctx context.Context, req *api.JobCance
 		return nil, err
 	}
 
-	sequence := &armadaevents.EventSequence{
-		Queue:      req.Queue,
-		JobSetName: req.JobSetId,
-		UserId:     userId,
-		Groups:     groups,
-		Events:     make([]*armadaevents.EventSequence_Event, 1, 1),
-	}
-
 	jobId, err := armadaevents.ProtoUuidFromUlidString(req.JobId)
 	if err != nil {
 		return nil, err
 	}
 
-	sequence.Events[0] = &armadaevents.EventSequence_Event{
-		Event: &armadaevents.EventSequence_Event_CancelJob{
-			CancelJob: &armadaevents.CancelJob{JobId: jobId},
+	sequence := &armadaevents.EventSequence{
+		Queue:      resolvedQueue,
+		JobSetName: resolvedJobset,
+		UserId:     userId,
+		Groups:     groups,
+		Events: []*armadaevents.EventSequence_Event{
+			{
+				Created: pointer.Now(),
+				Event: &armadaevents.EventSequence_Event_CancelJob{
+					CancelJob: &armadaevents.CancelJob{JobId: jobId},
+				},
+			},
 		},
 	}
 
@@ -340,6 +343,7 @@ func eventSequenceForJobIds(jobIds []string, q, jobSet, userId string, groups []
 		}
 		validIds = append(validIds, jobIdStr)
 		sequence.Events = append(sequence.Events, &armadaevents.EventSequence_Event{
+			Created: pointer.Now(),
 			Event: &armadaevents.EventSequence_Event_CancelJob{
 				CancelJob: &armadaevents.CancelJob{JobId: jobId},
 			},
@@ -402,33 +406,45 @@ func (srv *PulsarSubmitServer) CancelJobSet(ctx context.Context, req *api.JobSet
 		})
 	}
 
-	pulsarSchedulerSequence := &armadaevents.EventSequence{
-		Queue:      req.Queue,
-		JobSetName: req.JobSetId,
-		UserId:     userId,
-		Groups:     groups,
-		Events: []*armadaevents.EventSequence_Event{
-			{
-				Created: pointer.Now(),
-				Event: &armadaevents.EventSequence_Event_CancelJobSet{
-					CancelJobSet: &armadaevents.CancelJobSet{
-						// TODO: fill in states
-					},
-				},
-			},
-		},
-	}
-
 	err = srv.publishToPulsar(ctx, []*armadaevents.EventSequence{legacySchedulerSequence}, schedulers.Legacy)
 	if err != nil {
 		log.WithError(err).Error("failed to send cancel job messages to pulsar")
 		return nil, status.Error(codes.Internal, "failed to send cancel job messages to pulsar")
 	}
 
-	err = srv.publishToPulsar(ctx, []*armadaevents.EventSequence{pulsarSchedulerSequence}, schedulers.Pulsar)
-	if err != nil {
-		log.WithError(err).Error("failed to send cancel jobset message to pulsar")
-		return nil, status.Error(codes.Internal, "failed to send cancel jobset message to pulsar")
+	if srv.PulsarSchedulerEnabled {
+		states := make([]armadaevents.JobState, len(req.GetFilter().GetStates()))
+		for i := 0; i < len(states); i++ {
+			switch req.GetFilter().GetStates()[i] {
+			case api.JobState_PENDING:
+				states[i] = armadaevents.JobState_PENDING
+			case api.JobState_QUEUED:
+				states[i] = armadaevents.JobState_QUEUED
+			case api.JobState_RUNNING:
+				states[i] = armadaevents.JobState_RUNNING
+			}
+		}
+		pulsarSchedulerSequence := &armadaevents.EventSequence{
+			Queue:      req.Queue,
+			JobSetName: req.JobSetId,
+			UserId:     userId,
+			Groups:     groups,
+			Events: []*armadaevents.EventSequence_Event{
+				{
+					Created: pointer.Now(),
+					Event: &armadaevents.EventSequence_Event_CancelJobSet{
+						CancelJobSet: &armadaevents.CancelJobSet{
+							States: states,
+						},
+					},
+				},
+			},
+		}
+		err = srv.publishToPulsar(ctx, []*armadaevents.EventSequence{pulsarSchedulerSequence}, schedulers.Pulsar)
+		if err != nil {
+			log.WithError(err).Error("failed to send cancel jobset message to pulsar")
+			return nil, status.Error(codes.Internal, "failed to send cancel jobset message to pulsar")
+		}
 	}
 
 	return &types.Empty{}, err
@@ -703,9 +719,13 @@ func (srv *PulsarSubmitServer) getOriginalJobIds(ctx context.Context, apiJobs []
 	return nil, nil
 }
 
+// assignScheduler Assign a slice of jobs to either the legacy or pulsar schedulers.  This done by checking whether each
+// job can be scheduled on either scheduler.  If the job can only be scheduled on only one of the schedulers, it is
+// assigned to that scheduler. If it can be assigned to both scheduler it is assigned randomly based on
+// ProbabilityOdfUsingPulsarScheduler.  If it can be assigned on neither scheduler then an error is returned.
 func (srv *PulsarSubmitServer) assignScheduler(jobs []*api.Job) (map[string]schedulers.Scheduler, error) {
 	// when assigning jobs to a scheduler, all the jobs in a gang have to go on the same scheduler
-	groups := groupJobsByAnnotation(srv.GangIdAnnotation, jobs)
+	groups := srv.groupJobsByGangId(jobs)
 	assignedSchedulers := make(map[string]schedulers.Scheduler, len(jobs))
 	for _, group := range groups {
 		schedulableOnLegacyScheduler, legacyMsg := srv.LegacySchedulerSubmitChecker.CheckApiJobs(group)
@@ -746,14 +766,15 @@ func (srv *PulsarSubmitServer) assignScheduler(jobs []*api.Job) (map[string]sche
 	return assignedSchedulers, nil
 }
 
-func groupJobsByAnnotation(annotation string, jobs []*api.Job) [][]*api.Job {
+// group all the jobs by  gang id.  If no gang annotation is present then they will be put into a group of 1
+func (srv *PulsarSubmitServer) groupJobsByGangId(jobs []*api.Job) [][]*api.Job {
 	rv := make(map[string][]*api.Job)
 	for _, job := range jobs {
 		groupId := uuid.NewString()
 		if len(job.Annotations) == 0 {
 			rv[groupId] = append(rv[groupId], job)
 		} else {
-			value := job.Annotations[annotation]
+			value := job.Annotations[srv.GangIdAnnotation]
 			if value == "" {
 				rv[groupId] = append(rv[groupId], job)
 			}
@@ -763,6 +784,10 @@ func groupJobsByAnnotation(annotation string, jobs []*api.Job) [][]*api.Job {
 	return maps.Values(rv)
 }
 
+// resolveQueueAndJobsetForJob returns the queue and jobset for a job.
+// First we check the legacy scheeduler jobs and then (if no job resolved and pulsar scheduler enabled) we check
+// the pulsar scheduler jobs.
+// If no job can be retrieved then an error is returned.
 func (srv *PulsarSubmitServer) resolveQueueAndJobsetForJob(jobId string) (string, string, error) {
 	// Check the legacy scheduler first
 	jobs, err := srv.SubmitServer.jobRepository.GetJobsByIds([]string{jobId})
