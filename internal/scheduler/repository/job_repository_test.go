@@ -1,7 +1,8 @@
-package database
+package repository
 
 import (
 	"context"
+	database2 "github.com/armadaproject/armada/internal/scheduler/database"
 	"testing"
 	"time"
 
@@ -23,47 +24,47 @@ func TestFetchJobUpdates(t *testing.T) {
 	dbRuns, expectedRuns := createTestRuns(10)
 
 	tests := map[string]struct {
-		dbJobs       []Job
-		dbRuns       []Run
+		dbJobs       []database2.Job
+		dbRuns       []database2.Run
 		jobsSerial   int64
 		runsSerial   int64
-		expectedJobs []Job
-		expectedRuns []Run
+		expectedJobs []database2.Job
+		expectedRuns []database2.Run
 	}{
 		"all jobs": {
 			dbJobs:       dbJobs,
 			expectedJobs: expectedJobs,
-			expectedRuns: []Run{},
+			expectedRuns: []database2.Run{},
 			jobsSerial:   0,
 		},
 		"some jobs": {
 			dbJobs:       dbJobs,
 			expectedJobs: expectedJobs[5:],
-			expectedRuns: []Run{},
+			expectedRuns: []database2.Run{},
 			jobsSerial:   5,
 		},
 		"no jobs": {
 			dbJobs:       dbJobs,
-			expectedJobs: []Job{},
-			expectedRuns: []Run{},
+			expectedJobs: []database2.Job{},
+			expectedRuns: []database2.Run{},
 			jobsSerial:   10,
 		},
 		"all runs": {
 			dbRuns:       dbRuns,
 			expectedRuns: expectedRuns,
-			expectedJobs: []Job{},
+			expectedJobs: []database2.Job{},
 			jobsSerial:   0,
 		},
 		"some runs": {
 			dbRuns:       dbRuns,
 			expectedRuns: expectedRuns[5:],
-			expectedJobs: []Job{},
+			expectedJobs: []database2.Job{},
 			runsSerial:   5,
 		},
 		"no runs": {
 			dbRuns:       dbRuns,
-			expectedJobs: []Job{},
-			expectedRuns: []Run{},
+			expectedJobs: []database2.Job{},
+			expectedRuns: []database2.Run{},
 			runsSerial:   10,
 		},
 		"both jobs and runs": {
@@ -73,8 +74,8 @@ func TestFetchJobUpdates(t *testing.T) {
 			expectedRuns: expectedRuns,
 		},
 		"empty db": {
-			expectedJobs: []Job{},
-			expectedRuns: []Run{},
+			expectedJobs: []database2.Job{},
+			expectedRuns: []database2.Run{},
 		},
 	}
 	for name, tc := range tests {
@@ -124,10 +125,10 @@ func TestCountReceivedPartitions(t *testing.T) {
 			err := withJobRepository(func(repo *PostgresJobRepository) error {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
-				markers := make([]Marker, tc.numPartitions)
+				markers := make([]database2.Marker, tc.numPartitions)
 				groupId := uuid.New()
 				for i := 0; i < tc.numPartitions; i++ {
-					markers[i] = Marker{
+					markers[i] = database2.Marker{
 						GroupID:     groupId,
 						PartitionID: int32(i),
 					}
@@ -151,12 +152,12 @@ func TestCountReceivedPartitions(t *testing.T) {
 	}
 }
 
-func createTestJobs(numJobs int) ([]Job, []Job) {
-	dbJobs := make([]Job, numJobs)
-	expectedJobs := make([]Job, numJobs)
+func createTestJobs(numJobs int) ([]database2.Job, []database2.Job) {
+	dbJobs := make([]database2.Job, numJobs)
+	expectedJobs := make([]database2.Job, numJobs)
 
 	for i := 0; i < numJobs; i++ {
-		dbJobs[i] = Job{
+		dbJobs[i] = database2.Job{
 			JobID:           util.NewULID(),
 			JobSet:          "test-jobset",
 			Queue:           "test-queue",
@@ -172,7 +173,7 @@ func createTestJobs(numJobs int) ([]Job, []Job) {
 	}
 
 	for i, job := range dbJobs {
-		expectedJobs[i] = Job{
+		expectedJobs[i] = database2.Job{
 			JobID:           job.JobID,
 			JobSet:          job.JobSet,
 			Queue:           job.Queue,
@@ -195,7 +196,7 @@ func TestFindInactiveRuns(t *testing.T) {
 		uuids[i] = uuid.New()
 	}
 	tests := map[string]struct {
-		dbRuns           []Run
+		dbRuns           []database2.Run
 		runsToCheck      []uuid.UUID
 		expectedInactive []uuid.UUID
 	}{
@@ -205,7 +206,7 @@ func TestFindInactiveRuns(t *testing.T) {
 		},
 		"no inactive": {
 			runsToCheck: uuids,
-			dbRuns: []Run{
+			dbRuns: []database2.Run{
 				{RunID: uuids[0]},
 				{RunID: uuids[1]},
 				{RunID: uuids[2]},
@@ -214,7 +215,7 @@ func TestFindInactiveRuns(t *testing.T) {
 		},
 		"run succeeded": {
 			runsToCheck: uuids,
-			dbRuns: []Run{
+			dbRuns: []database2.Run{
 				{RunID: uuids[0]},
 				{RunID: uuids[1], Succeeded: true},
 				{RunID: uuids[2]},
@@ -223,7 +224,7 @@ func TestFindInactiveRuns(t *testing.T) {
 		},
 		"run failed": {
 			runsToCheck: uuids,
-			dbRuns: []Run{
+			dbRuns: []database2.Run{
 				{RunID: uuids[0]},
 				{RunID: uuids[1], Failed: true},
 				{RunID: uuids[2]},
@@ -232,7 +233,7 @@ func TestFindInactiveRuns(t *testing.T) {
 		},
 		"run cancelled": {
 			runsToCheck: uuids,
-			dbRuns: []Run{
+			dbRuns: []database2.Run{
 				{RunID: uuids[0]},
 				{RunID: uuids[1], Cancelled: true},
 				{RunID: uuids[2]},
@@ -241,7 +242,7 @@ func TestFindInactiveRuns(t *testing.T) {
 		},
 		"run missing": {
 			runsToCheck: uuids,
-			dbRuns: []Run{
+			dbRuns: []database2.Run{
 				{RunID: uuids[0]},
 				{RunID: uuids[2]},
 			},
@@ -277,7 +278,7 @@ func TestFetchJobRunLeases(t *testing.T) {
 
 	// first three runs can be picked up by executor
 	// last three runs are not available
-	dbRuns := []Run{
+	dbRuns := []database2.Run{
 		{
 			RunID:    uuid.New(),
 			JobID:    dbJobs[0].JobID,
@@ -330,8 +331,8 @@ func TestFetchJobRunLeases(t *testing.T) {
 		}
 	}
 	tests := map[string]struct {
-		dbRuns         []Run
-		dbJobs         []Job
+		dbRuns         []database2.Run
+		dbJobs         []database2.Job
 		excludedRuns   []uuid.UUID
 		maxRowsToFetch uint
 		executor       string
@@ -403,12 +404,12 @@ func TestFetchJobRunLeases(t *testing.T) {
 	}
 }
 
-func createTestRuns(numRuns int) ([]Run, []Run) {
-	dbRuns := make([]Run, numRuns)
-	expectedRuns := make([]Run, numRuns)
+func createTestRuns(numRuns int) ([]database2.Run, []database2.Run) {
+	dbRuns := make([]database2.Run, numRuns)
+	expectedRuns := make([]database2.Run, numRuns)
 
 	for i := 0; i < numRuns; i++ {
-		dbRuns[i] = Run{
+		dbRuns[i] = database2.Run{
 			RunID:     uuid.New(),
 			JobID:     util.NewULID(),
 			JobSet:    "test-jobset",
@@ -422,7 +423,7 @@ func createTestRuns(numRuns int) ([]Run, []Run) {
 	}
 
 	for i, run := range dbRuns {
-		expectedRuns[i] = Run{
+		expectedRuns[i] = database2.Run{
 			RunID:     run.RunID,
 			JobID:     run.JobID,
 			JobSet:    run.JobSet,
@@ -439,13 +440,13 @@ func createTestRuns(numRuns int) ([]Run, []Run) {
 }
 
 func withJobRepository(action func(repository *PostgresJobRepository) error) error {
-	return WithTestDb(func(_ *Queries, db *pgxpool.Pool) error {
+	return database2.WithTestDb(func(_ *database2.Queries, db *pgxpool.Pool) error {
 		repo := NewPostgresJobRepository(db, defaultBatchSize)
 		return action(repo)
 	})
 }
 
-func insertMarkers(ctx context.Context, markers []Marker, db *pgxpool.Pool) error {
+func insertMarkers(ctx context.Context, markers []database2.Marker, db *pgxpool.Pool) error {
 	for _, marker := range markers {
 		_, err := db.Exec(ctx, "INSERT INTO markers VALUES ($1, $2)", marker.GroupID, marker.PartitionID)
 		if err != nil {

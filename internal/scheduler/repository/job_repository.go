@@ -1,8 +1,9 @@
-package database
+package repository
 
 import (
 	"context"
 	"fmt"
+	database2 "github.com/armadaproject/armada/internal/scheduler/database"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/google/uuid"
@@ -33,7 +34,7 @@ type JobRunLease struct {
 type JobRepository interface {
 	// FetchJobUpdates returns all jobs and job dbRuns that have been updated after jobSerial and jobRunSerial respectively
 	// These updates are guaranteed to be consistent with each other
-	FetchJobUpdates(ctx context.Context, jobSerial int64, jobRunSerial int64) ([]Job, []Run, error)
+	FetchJobUpdates(ctx context.Context, jobSerial int64, jobRunSerial int64) ([]database2.Job, []database2.Run, error)
 
 	// FetchJobRunErrors returns all armadaevents.JobRunErrors for the provided job run ids.  The returned map is
 	// keyed by job run id.  Any dbRuns which don't have errors wil be absent from the map.
@@ -71,7 +72,7 @@ func NewPostgresJobRepository(db *pgxpool.Pool, batchSize int32) *PostgresJobRep
 // FetchJobRunErrors returns all armadaevents.JobRunErrors for the provided job run ids.  The returned map is
 // keyed by job run id.  Any dbRuns which don't have errors wil be absent from the map.
 func (r *PostgresJobRepository) FetchJobRunErrors(ctx context.Context, runIds []uuid.UUID) (map[uuid.UUID]*armadaevents.JobRunErrors, error) {
-	queries := New(r.db)
+	queries := database2.New(r.db)
 	rows, err := queries.SelectRunErrorsById(ctx, runIds)
 	if err == nil {
 		return nil, errors.WithStack(err)
@@ -101,9 +102,9 @@ func (r *PostgresJobRepository) FetchJobRunErrors(ctx context.Context, runIds []
 
 // FetchJobUpdates returns all jobs and job dbRuns that have been updated after jobSerial and jobRunSerial respectively
 // These updates are guaranteed to be consistent with each other
-func (r *PostgresJobRepository) FetchJobUpdates(ctx context.Context, jobSerial int64, jobRunSerial int64) ([]Job, []Run, error) {
-	var updatedJobs []Job = nil
-	var updatedRuns []Run = nil
+func (r *PostgresJobRepository) FetchJobUpdates(ctx context.Context, jobSerial int64, jobRunSerial int64) ([]database2.Job, []database2.Run, error) {
+	var updatedJobs []database2.Job = nil
+	var updatedRuns []database2.Run = nil
 
 	// Use a RepeatableRead transaction here so that we get consistency between jobs and dbRuns
 	err := r.db.BeginTxFunc(ctx, pgx.TxOptions{
@@ -112,15 +113,15 @@ func (r *PostgresJobRepository) FetchJobUpdates(ctx context.Context, jobSerial i
 		DeferrableMode: pgx.Deferrable,
 	}, func(tx pgx.Tx) error {
 		var err error
-		queries := New(tx)
+		queries := database2.New(tx)
 
 		// Fetch jobs
-		updatedJobRows, err := fetch(jobSerial, r.batchSize, func(from int64) ([]SelectUpdatedJobsRow, error) {
-			return queries.SelectUpdatedJobs(ctx, SelectUpdatedJobsParams{Serial: from, Limit: r.batchSize})
+		updatedJobRows, err := fetch(jobSerial, r.batchSize, func(from int64) ([]database2.SelectUpdatedJobsRow, error) {
+			return queries.SelectUpdatedJobs(ctx, database2.SelectUpdatedJobsParams{Serial: from, Limit: r.batchSize})
 		})
-		updatedJobs = make([]Job, len(updatedJobRows))
+		updatedJobs = make([]database2.Job, len(updatedJobRows))
 		for i, row := range updatedJobRows {
-			updatedJobs[i] = Job{
+			updatedJobs[i] = database2.Job{
 				JobID:           row.JobID,
 				JobSet:          row.JobSet,
 				Queue:           row.Queue,
@@ -140,8 +141,8 @@ func (r *PostgresJobRepository) FetchJobUpdates(ctx context.Context, jobSerial i
 		}
 
 		// Fetch dbRuns
-		updatedRuns, err = fetch(jobRunSerial, r.batchSize, func(from int64) ([]Run, error) {
-			return queries.SelectNewRuns(ctx, SelectNewRunsParams{Serial: from, Limit: r.batchSize})
+		updatedRuns, err = fetch(jobRunSerial, r.batchSize, func(from int64) ([]database2.Run, error) {
+			return queries.SelectNewRuns(ctx, database2.SelectNewRunsParams{Serial: from, Limit: r.batchSize})
 		})
 
 		return err
@@ -241,7 +242,7 @@ func (r *PostgresJobRepository) FetchJobRunLeases(ctx context.Context, executor 
 // to the provided groupId.  This is used by the scheduler to determine if the database represents the state of
 // pulsar after a given point in time.
 func (r *PostgresJobRepository) CountReceivedPartitions(ctx context.Context, groupId uuid.UUID) (uint32, error) {
-	queries := New(r.db)
+	queries := database2.New(r.db)
 	count, err := queries.CountGroup(ctx, groupId)
 	if err != nil {
 		return 0, err

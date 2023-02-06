@@ -1,6 +1,7 @@
-package scheduler
+package jobdb
 
 import (
+	"github.com/armadaproject/armada/internal/scheduler"
 	"math/rand"
 	"testing"
 
@@ -17,7 +18,7 @@ func TestJobDbSchema(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-var job1 = &SchedulerJob{
+var job1 = &Job{
 	JobId:             uuid.NewString(),
 	Queue:             "A",
 	Priority:          0,
@@ -25,7 +26,7 @@ var job1 = &SchedulerJob{
 	jobSchedulingInfo: nil,
 }
 
-var job2 = &SchedulerJob{
+var job2 = &Job{
 	JobId:             uuid.NewString(),
 	Queue:             "A",
 	Priority:          0,
@@ -35,26 +36,26 @@ var job2 = &SchedulerJob{
 
 func TestBatchDelete(t *testing.T) {
 	tests := map[string]struct {
-		initialJobs          []*SchedulerJob
+		initialJobs          []*Job
 		idsToDelete          []string
 		expectedRemainingIds []string
 	}{
 		"Delete all jobs": {
-			initialJobs: []*SchedulerJob{job1, job2},
+			initialJobs: []*Job{job1, job2},
 			idsToDelete: []string{job1.JobId, job2.JobId},
 		},
 		"Delete one job": {
-			initialJobs:          []*SchedulerJob{job1, job2},
+			initialJobs:          []*Job{job1, job2},
 			idsToDelete:          []string{job1.JobId},
 			expectedRemainingIds: []string{job2.JobId},
 		},
 		"Delete non-existent job": {
-			initialJobs:          []*SchedulerJob{job1, job2},
+			initialJobs:          []*Job{job1, job2},
 			idsToDelete:          []string{"notaJobId", job1.JobId},
 			expectedRemainingIds: []string{job2.JobId},
 		},
 		"delete nothing": {
-			initialJobs:          []*SchedulerJob{job1, job2},
+			initialJobs:          []*Job{job1, job2},
 			idsToDelete:          []string{},
 			expectedRemainingIds: []string{job1.JobId, job2.JobId},
 		},
@@ -76,7 +77,7 @@ func TestBatchDelete(t *testing.T) {
 
 			// check that db is as we expect
 			allJobs, err := jobDb.GetAll(txn)
-			outstandingIds := stringSet(tc.expectedRemainingIds)
+			outstandingIds := scheduler.stringSet(tc.expectedRemainingIds)
 			require.NoError(t, err)
 			for _, job := range allJobs {
 				_, ok := outstandingIds[job.JobId]
@@ -90,24 +91,24 @@ func TestBatchDelete(t *testing.T) {
 
 func TestUpsert(t *testing.T) {
 	tests := map[string]struct {
-		initialJobs  []*SchedulerJob
-		jobsToUpsert []*SchedulerJob
+		initialJobs  []*Job
+		jobsToUpsert []*Job
 	}{
 		"Insert new job": {
-			initialJobs:  []*SchedulerJob{},
-			jobsToUpsert: []*SchedulerJob{job1, job2},
+			initialJobs:  []*Job{},
+			jobsToUpsert: []*Job{job1, job2},
 		},
 		"modify existing job": {
-			initialJobs: []*SchedulerJob{},
-			jobsToUpsert: []*SchedulerJob{{
+			initialJobs: []*Job{},
+			jobsToUpsert: []*Job{{
 				JobId:  job1.JobId,
 				Queue:  "some queue",
 				Jobset: "some jobset",
 			}},
 		},
 		"insert nothing": {
-			initialJobs:  []*SchedulerJob{},
-			jobsToUpsert: []*SchedulerJob{},
+			initialJobs:  []*Job{},
+			jobsToUpsert: []*Job{},
 		},
 	}
 
@@ -133,17 +134,17 @@ func TestUpsert(t *testing.T) {
 
 func TestGetById(t *testing.T) {
 	tests := map[string]struct {
-		initialJobs   []*SchedulerJob
+		initialJobs   []*Job
 		jobToRetrieve string
 		jobPresent    bool
 	}{
 		"Job Present": {
-			initialJobs:   []*SchedulerJob{job1, job2},
+			initialJobs:   []*Job{job1, job2},
 			jobToRetrieve: job1.JobId,
 			jobPresent:    true,
 		},
 		"Job Missing": {
-			initialJobs:   []*SchedulerJob{job1, job2},
+			initialJobs:   []*Job{job1, job2},
 			jobToRetrieve: "notAJob",
 			jobPresent:    false,
 		},
@@ -170,14 +171,14 @@ func TestGetById(t *testing.T) {
 }
 
 func TestLookupByRun(t *testing.T) {
-	job := &SchedulerJob{
+	job := &Job{
 		JobId:     uuid.NewString(),
 		Queue:     "A",
 		Priority:  0,
 		Timestamp: 10,
 	}
 
-	run := &JobRun{
+	run := &Run{
 		RunID: uuid.New(),
 	}
 
@@ -185,7 +186,7 @@ func TestLookupByRun(t *testing.T) {
 	jobDb, err := NewJobDb()
 	require.NoError(t, err)
 	txn := jobDb.WriteTxn()
-	err = jobDb.Upsert(txn, []*SchedulerJob{job})
+	err = jobDb.Upsert(txn, []*Job{job})
 	require.NoError(t, err)
 
 	// try to lookup the job by run id- this should be nil as no run exists yet
@@ -196,7 +197,7 @@ func TestLookupByRun(t *testing.T) {
 	// update the job to have a run
 	updatedJob := job.DeepCopy()
 	updatedJob.Runs = append(updatedJob.Runs, run)
-	err = jobDb.Upsert(txn, []*SchedulerJob{updatedJob})
+	err = jobDb.Upsert(txn, []*Job{updatedJob})
 	require.NoError(t, err)
 
 	// try to lookup the job by run id- this should now return the job
@@ -215,21 +216,21 @@ func TestLookupByRun(t *testing.T) {
 }
 
 func TestGetAll(t *testing.T) {
-	jobs := []*SchedulerJob{job1, job2}
+	jobs := []*Job{job1, job2}
 	jobDb := createPopulatedJobDb(t, jobs)
 
 	txn := jobDb.ReadTxn()
 	retrievedJobs, err := jobDb.GetAll(txn)
 	require.NoError(t, err)
 
-	slices.SortFunc(jobs, func(a *SchedulerJob, b *SchedulerJob) bool { return a.JobId > b.JobId })
-	slices.SortFunc(retrievedJobs, func(a *SchedulerJob, b *SchedulerJob) bool { return a.JobId > b.JobId })
+	slices.SortFunc(jobs, func(a *Job, b *Job) bool { return a.JobId > b.JobId })
+	slices.SortFunc(retrievedJobs, func(a *Job, b *Job) bool { return a.JobId > b.JobId })
 	assert.Equal(t, jobs, retrievedJobs)
 }
 
 func TestJobQueuePriorityClassIterator(t *testing.T) {
 	// jobs in the db at the start of the test
-	initialJobs := []*SchedulerJob{
+	initialJobs := []*Job{
 		// Jobs on queue A
 		{
 			JobId:     util.NewULID(),
@@ -291,7 +292,7 @@ func TestJobQueuePriorityClassIterator(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Shuffle and insert jobs.
 			jobs := slices.Clone(initialJobs)
-			slices.SortFunc(jobs, func(a, b *SchedulerJob) bool { return rand.Float64() < 0.5 })
+			slices.SortFunc(jobs, func(a, b *Job) bool { return rand.Float64() < 0.5 })
 			jobDb := createPopulatedJobDb(t, jobs)
 
 			// Test that jobs are returned in expected order.
@@ -311,7 +312,7 @@ func TestJobQueuePriorityClassIterator(t *testing.T) {
 	}
 }
 
-func createPopulatedJobDb(t *testing.T, initialJobs []*SchedulerJob) *JobDb {
+func createPopulatedJobDb(t *testing.T, initialJobs []*Job) *JobDb {
 	jobDb, err := NewJobDb()
 	require.NoError(t, err)
 	txn := jobDb.WriteTxn()

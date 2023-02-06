@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"github.com/armadaproject/armada/internal/scheduler/repository"
 	"testing"
 	"time"
 
@@ -201,7 +202,7 @@ func TestPruneDb_RemoveMarkers(t *testing.T) {
 				queries := New(db)
 				dbConn, err := db.Acquire(ctx)
 				require.NoError(t, err)
-				err = PruneDb(ctx, dbConn.Conn(), defaultBatchSize, defaultKeepAfterDuration, testClock)
+				err = PruneDb(ctx, dbConn.Conn(), repository.defaultBatchSize, defaultKeepAfterDuration, testClock)
 				require.NoError(t, err)
 
 				remainingMarkers, err := queries.SelectAllMarkers(ctx)

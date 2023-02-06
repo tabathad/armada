@@ -1,6 +1,7 @@
-package scheduler
+package api
 
 import (
+	"github.com/armadaproject/armada/internal/scheduler/repository"
 	"testing"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 
 	"github.com/armadaproject/armada/internal/common/compress"
 	"github.com/armadaproject/armada/internal/common/pulsarutils"
-	"github.com/armadaproject/armada/internal/scheduler/database"
 	schedulermocks "github.com/armadaproject/armada/internal/scheduler/mocks"
 	"github.com/armadaproject/armada/internal/scheduler/schedulerobjects"
 	"github.com/armadaproject/armada/pkg/api"
@@ -67,7 +67,7 @@ func TestExecutorApi_LeaseJobRuns(t *testing.T) {
 		UnassignedJobRuns: []string{runId3.String()},
 	}
 
-	defaultLease := &database.JobRunLease{
+	defaultLease := &repository.JobRunLease{
 		RunID:         uuid.New(),
 		Queue:         "test-queue",
 		JobSet:        "test-jobset",
@@ -79,14 +79,14 @@ func TestExecutorApi_LeaseJobRuns(t *testing.T) {
 	tests := map[string]struct {
 		request          *executorapi.LeaseRequest
 		runsToCancel     []uuid.UUID
-		leases           []*database.JobRunLease
+		leases           []*repository.JobRunLease
 		expectedExecutor *schedulerobjects.Executor
 		expectedMsgs     []*executorapi.LeaseStreamMessage
 	}{
 		"lease and cancel": {
 			request:          defaultRequest,
 			runsToCancel:     []uuid.UUID{runId2},
-			leases:           []*database.JobRunLease{defaultLease},
+			leases:           []*repository.JobRunLease{defaultLease},
 			expectedExecutor: defaultExpectedExecutor,
 			expectedMsgs: []*executorapi.LeaseStreamMessage{
 				{

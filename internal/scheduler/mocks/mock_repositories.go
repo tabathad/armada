@@ -6,6 +6,7 @@ package schedulermocks
 
 import (
 	context "context"
+	"github.com/armadaproject/armada/internal/scheduler/repository"
 	reflect "reflect"
 	time "time"
 
@@ -175,10 +176,10 @@ func (mr *MockJobRepositoryMockRecorder) FetchJobRunErrors(arg0, arg1 interface{
 }
 
 // FetchJobRunLeases mocks base method.
-func (m *MockJobRepository) FetchJobRunLeases(arg0 context.Context, arg1 string, arg2 uint, arg3 []uuid.UUID) ([]*database.JobRunLease, error) {
+func (m *MockJobRepository) FetchJobRunLeases(arg0 context.Context, arg1 string, arg2 uint, arg3 []uuid.UUID) ([]*repository.JobRunLease, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FetchJobRunLeases", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].([]*database.JobRunLease)
+	ret0, _ := ret[0].([]*repository.JobRunLease)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

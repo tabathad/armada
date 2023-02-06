@@ -1,6 +1,7 @@
-package database
+package repository
 
 import (
+	"github.com/armadaproject/armada/internal/scheduler/database"
 	"testing"
 
 	"github.com/go-redis/redis"
@@ -14,7 +15,7 @@ import (
 func TestLegacyQueueRepository_GetAllQueues(t *testing.T) {
 	tests := map[string]struct {
 		queues         []clientQueue.Queue
-		expectedQueues []*Queue
+		expectedQueues []*database.Queue
 	}{
 		"Not empty": {
 			queues: []clientQueue.Queue{
@@ -27,7 +28,7 @@ func TestLegacyQueueRepository_GetAllQueues(t *testing.T) {
 					PriorityFactor: 20,
 				},
 			},
-			expectedQueues: []*Queue{
+			expectedQueues: []*database.Queue{
 				{
 					Name:   "test-queue-1",
 					Weight: 10,
@@ -40,7 +41,7 @@ func TestLegacyQueueRepository_GetAllQueues(t *testing.T) {
 		},
 		"Empty": {
 			queues:         []clientQueue.Queue{},
-			expectedQueues: []*Queue{},
+			expectedQueues: []*database.Queue{},
 		},
 	}
 	for name, tc := range tests {
@@ -58,7 +59,7 @@ func TestLegacyQueueRepository_GetAllQueues(t *testing.T) {
 			}
 			retrievedQueues, err := repo.GetAllQueues()
 			require.NoError(t, err)
-			sortFunc := func(a, b *Queue) bool { return a.Name > b.Name }
+			sortFunc := func(a, b *database.Queue) bool { return a.Name > b.Name }
 			slices.SortFunc(tc.expectedQueues, sortFunc)
 			slices.SortFunc(retrievedQueues, sortFunc)
 			assert.Equal(t, tc.expectedQueues, retrievedQueues)

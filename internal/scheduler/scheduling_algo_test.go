@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"github.com/armadaproject/armada/internal/scheduler/jobdb"
 	"testing"
 	"time"
 
@@ -34,17 +35,17 @@ var (
 )
 
 func TestLegacySchedulingAlgo_TestSchedule(t *testing.T) {
-	queuedJobs := make([]*SchedulerJob, 10)
+	queuedJobs := make([]*jobdb.Job, 10)
 	for i := 0; i < 10; i++ {
 		queuedJobs[i] = OneCpuJob()
 		queuedJobs[i].Timestamp = int64(i) // ensure the queuedJobs are in the order we expect
 	}
-	runningJobs := []*SchedulerJob{OneCoreRunningJob("executor1"), OneCoreRunningJob("executor1")}
+	runningJobs := []*jobdb.Job{OneCoreRunningJob("executor1"), OneCoreRunningJob("executor1")}
 	tests := map[string]struct {
 		executors     []*schedulerobjects.Executor
 		queues        []*database.Queue
-		queuedJobs    []*SchedulerJob
-		runningJobs   []*SchedulerJob
+		queuedJobs    []*jobdb.Job
+		runningJobs   []*jobdb.Job
 		perQueueLimit map[string]float64
 		expectedJobs  map[string]string // map of jobId to name of executor on which it should be scheduled
 	}{
@@ -81,7 +82,7 @@ func TestLegacySchedulingAlgo_TestSchedule(t *testing.T) {
 			},
 			queues:      []*database.Queue{&queue},
 			queuedJobs:  queuedJobs,
-			runningJobs: []*SchedulerJob{runningJobs[0].DeepCopy(), runningJobs[1].DeepCopy()},
+			runningJobs: []*jobdb.Job{runningJobs[0].DeepCopy(), runningJobs[1].DeepCopy()},
 			expectedJobs: map[string]string{
 				queuedJobs[0].JobId: "executor2",
 				queuedJobs[1].JobId: "executor2",
@@ -94,18 +95,18 @@ func TestLegacySchedulingAlgo_TestSchedule(t *testing.T) {
 			},
 			queues:        []*database.Queue{&queue},
 			queuedJobs:    queuedJobs,
-			runningJobs:   []*SchedulerJob{runningJobs[0].DeepCopy(), runningJobs[1].DeepCopy()},
+			runningJobs:   []*jobdb.Job{runningJobs[0].DeepCopy(), runningJobs[1].DeepCopy()},
 			perQueueLimit: map[string]float64{"cpu": 0.5},
 			expectedJobs:  map[string]string{},
 		},
 		"user hits usage cap during scheduling": {
 			executors: []*schedulerobjects.Executor{
-				TwoCoreExecutor("executor1", []*SchedulerJob{runningJobs[0]}, baseTime),
+				TwoCoreExecutor("executor1", []*jobdb.Job{runningJobs[0]}, baseTime),
 				TwoCoreExecutor("executor2", nil, baseTime),
 			},
 			queues:        []*database.Queue{&queue},
 			queuedJobs:    queuedJobs,
-			runningJobs:   []*SchedulerJob{runningJobs[0].DeepCopy()},
+			runningJobs:   []*jobdb.Job{runningJobs[0].DeepCopy()},
 			perQueueLimit: map[string]float64{"cpu": 0.5},
 			expectedJobs: map[string]string{
 				queuedJobs[0].JobId: "executor1",
@@ -150,7 +151,7 @@ func TestLegacySchedulingAlgo_TestSchedule(t *testing.T) {
 			algo.clock = clock.NewFakeClock(baseTime)
 
 			// Set up JobDb
-			jobDb, err := NewJobDb()
+			jobDb, err := jobdb.NewJobDb()
 			require.NoError(t, err)
 			txn := jobDb.WriteTxn()
 			err = jobDb.Upsert(txn, append(tc.queuedJobs, tc.runningJobs...))
@@ -181,7 +182,7 @@ func TestLegacySchedulingAlgo_TestSchedule(t *testing.T) {
 	}
 }
 
-func twoCoreNode(jobs []*SchedulerJob) *schedulerobjects.Node {
+func twoCoreNode(jobs []*jobdb.Job) *schedulerobjects.Node {
 	usedCpu := resource.MustParse("0")
 	for _, job := range jobs {
 		cpuReq := job.
@@ -212,13 +213,13 @@ func twoCoreNode(jobs []*SchedulerJob) *schedulerobjects.Node {
 				"memory": resource.MustParse("256Gi"),
 			},
 		),
-		JobRuns: slices.Map(jobs, func(j *SchedulerJob) string {
+		JobRuns: slices.Map(jobs, func(j *jobdb.Job) string {
 			return j.Runs[0].RunID.String()
 		}),
 	}
 }
 
-func TwoCoreExecutor(name string, jobs []*SchedulerJob, updateTime time.Time) *schedulerobjects.Executor {
+func TwoCoreExecutor(name string, jobs []*jobdb.Job, updateTime time.Time) *schedulerobjects.Executor {
 	return &schedulerobjects.Executor{
 		Id:             name,
 		Pool:           poolName,
@@ -227,8 +228,8 @@ func TwoCoreExecutor(name string, jobs []*SchedulerJob, updateTime time.Time) *s
 	}
 }
 
-func OneCpuJob() *SchedulerJob {
-	return &SchedulerJob{
+func OneCpuJob() *jobdb.Job {
+	return &jobdb.Job{
 		JobId:    util.NewULID(),
 		Queue:    queueName,
 		Jobset:   "test-jobset",
@@ -260,10 +261,10 @@ func OneCpuJob() *SchedulerJob {
 	}
 }
 
-func OneCoreRunningJob(executor string) *SchedulerJob {
+func OneCoreRunningJob(executor string) *jobdb.Job {
 	job := OneCpuJob()
 	job.Queued = false
-	job.Runs = []*JobRun{{
+	job.Runs = []*jobdb.Run{{
 		RunID:    uuid.New(),
 		Executor: executor,
 	}}

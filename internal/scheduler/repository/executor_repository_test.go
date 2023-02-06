@@ -1,7 +1,8 @@
-package database
+package repository
 
 import (
 	"context"
+	"github.com/armadaproject/armada/internal/scheduler/database"
 	"testing"
 	"time"
 
@@ -123,7 +124,7 @@ func TestExecutorRepository_GetLastUpdateTimes(t *testing.T) {
 }
 
 func withExecutorRepository(action func(repository *PostgresExecutorRepository) error) error {
-	return WithTestDb(func(_ *Queries, db *pgxpool.Pool) error {
+	return database.WithTestDb(func(_ *database.Queries, db *pgxpool.Pool) error {
 		repo := NewPostgresExecutorRepository(db)
 		return action(repo)
 	})

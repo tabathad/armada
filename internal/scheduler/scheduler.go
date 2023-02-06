@@ -2,6 +2,8 @@ package scheduler
 
 import (
 	"context"
+	"github.com/armadaproject/armada/internal/scheduler/jobdb"
+	"github.com/armadaproject/armada/internal/scheduler/repository"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -29,9 +31,9 @@ import (
 //   - Publish any armada events resulting from the cycle to Pulsar
 type Scheduler struct {
 	// Provides job updates from Postgres
-	jobRepository database.JobRepository
+	jobRepository repository.JobRepository
 	// Used to determine whether a cluster is active
-	executorRepository database.ExecutorRepository
+	executorRepository repository.ExecutorRepository
 	// Responsible for assigning jobs to nodes
 	schedulingAlgo SchedulingAlgo
 	// Tells us if we are leader. Only the leader may schedule jobs
@@ -49,7 +51,7 @@ type Scheduler struct {
 	// Used for all timing decisions (sleep etc.). Injected here so that we can mock out for testing
 	clock clock.Clock
 	// Stores active jobs (i.e. queued/running) and provides fast in-memory lookups on them
-	jobDb *JobDb
+	jobDb *jobdb.JobDb
 	// Highest offset we've read from Postgres on the Jobs table.
 	jobsSerial int64
 	// Highest offset we've read from Postgres on the Job Runs table.
@@ -59,8 +61,8 @@ type Scheduler struct {
 }
 
 func NewScheduler(
-	jobRepository database.JobRepository,
-	executorRepository database.ExecutorRepository,
+	jobRepository repository.JobRepository,
+	executorRepository repository.ExecutorRepository,
 	schedulingAlgo SchedulingAlgo,
 	leaderController LeaderController,
 	publisher Publisher,
@@ -69,7 +71,7 @@ func NewScheduler(
 	executorTimeout time.Duration,
 	maxLeaseReturns uint,
 ) (*Scheduler, error) {
-	jobDb, err := NewJobDb()
+	jobDb, err := jobdb.NewJobDb()
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +219,7 @@ func (s *Scheduler) cycle(ctx context.Context, updateAll bool, leaderToken Leade
 
 // syncState updates the state of the jobs in jobDb to match the state in postgres
 // It returns all jobs that have been updated
-func (s *Scheduler) syncState(ctx context.Context) ([]*SchedulerJob, error) {
+func (s *Scheduler) syncState(ctx context.Context) ([]*jobdb.Job, error) {
 	updatedJobs, updatedRuns, err := s.jobRepository.FetchJobUpdates(ctx, s.jobsSerial, s.runsSerial)
 	if err != nil {
 		return nil, err
@@ -228,7 +230,7 @@ func (s *Scheduler) syncState(ctx context.Context) ([]*SchedulerJob, error) {
 	defer txn.Abort()
 
 	jobsToDelete := make([]string, 0, len(updatedJobs))
-	jobsToUpdateById := make(map[string]*SchedulerJob, len(updatedJobs))
+	jobsToUpdateById := make(map[string]*jobdb.Job, len(updatedJobs))
 	for _, dbJob := range updatedJobs {
 		// Scheduler has sent a terminal message therefore we can safely remove the job
 		if dbJob.InTerminalState() {
@@ -323,7 +325,7 @@ func (s *Scheduler) syncState(ctx context.Context) ([]*SchedulerJob, error) {
 }
 
 // generateLeaseMessages generates EventSequences from the supplied slice of leased jobs
-func (s *Scheduler) generateLeaseMessages(scheduledJobs []*SchedulerJob) ([]*armadaevents.EventSequence, error) {
+func (s *Scheduler) generateLeaseMessages(scheduledJobs []*jobdb.Job) ([]*armadaevents.EventSequence, error) {
 	events := make([]*armadaevents.EventSequence, len(scheduledJobs))
 	for i, job := range scheduledJobs {
 		jobId, err := armadaevents.ProtoUuidFromUlidString(job.JobId)
@@ -352,7 +354,7 @@ func (s *Scheduler) generateLeaseMessages(scheduledJobs []*SchedulerJob) ([]*arm
 }
 
 // removeTerminalJobs takes the supplied list of jobs and removes any that are in a terminal state from the Job Db
-func (s *Scheduler) removeTerminalJobs(txn *memdb.Txn, updatedJobs []*SchedulerJob) error {
+func (s *Scheduler) removeTerminalJobs(txn *memdb.Txn, updatedJobs []*jobdb.Job) error {
 	idsToDelete := make([]string, 0)
 	for _, job := range updatedJobs {
 		if job.InTerminalState() {
@@ -364,7 +366,7 @@ func (s *Scheduler) removeTerminalJobs(txn *memdb.Txn, updatedJobs []*SchedulerJ
 
 // generateUpdateMessages generates EventSequences representing the state changes on updated jobs
 // If there are no state changes then an empty slice will be returned
-func (s *Scheduler) generateUpdateMessages(ctx context.Context, updatedJobs []*SchedulerJob) ([]*armadaevents.EventSequence, error) {
+func (s *Scheduler) generateUpdateMessages(ctx context.Context, updatedJobs []*jobdb.Job) ([]*armadaevents.EventSequence, error) {
 	failedRunIds := make([]uuid.UUID, 0, len(updatedJobs))
 	for _, job := range updatedJobs {
 		run := job.CurrentRun()
@@ -393,7 +395,7 @@ func (s *Scheduler) generateUpdateMessages(ctx context.Context, updatedJobs []*S
 
 // generateUpdateMessages generates EventSequence representing the state change on a single jobs
 // If there are no state changes then nil will be returned
-func (s *Scheduler) generateUpdateMessagesFromJob(job *SchedulerJob, jobRunErrors map[uuid.UUID]*armadaevents.JobRunErrors) (*armadaevents.EventSequence, error) {
+func (s *Scheduler) generateUpdateMessagesFromJob(job *jobdb.Job, jobRunErrors map[uuid.UUID]*armadaevents.JobRunErrors) (*armadaevents.EventSequence, error) {
 	var events []*armadaevents.EventSequence_Event
 
 	// Is the job already in a terminal state?  If so then don't send any more messages
@@ -612,7 +614,7 @@ func (s *Scheduler) ensureDbUpToDate(ctx context.Context, pollInterval time.Dura
 }
 
 // createSchedulerJob creates a new scheduler job from a database job
-func (s *Scheduler) createSchedulerJob(dbJob *database.Job) (*SchedulerJob, error) {
+func (s *Scheduler) createSchedulerJob(dbJob *database.Job) (*jobdb.Job, error) {
 	schedulingInfo := &schedulerobjects.JobSchedulingInfo{}
 	err := proto.Unmarshal(dbJob.SchedulingInfo, schedulingInfo)
 	if err != nil {
@@ -620,7 +622,7 @@ func (s *Scheduler) createSchedulerJob(dbJob *database.Job) (*SchedulerJob, erro
 			errors.WithStack(err), "error unmarshalling scheduling info for job %s", dbJob.JobID)
 	}
 	s.internJobSchedulingInfoStrings(schedulingInfo)
-	return &SchedulerJob{
+	return &jobdb.Job{
 		JobId:             dbJob.JobID,
 		Jobset:            s.stringInterner.Intern(dbJob.JobSet),
 		Queue:             s.stringInterner.Intern(dbJob.Queue),
@@ -634,8 +636,8 @@ func (s *Scheduler) createSchedulerJob(dbJob *database.Job) (*SchedulerJob, erro
 }
 
 // createSchedulerRun creates a new scheduler job run from a database job run
-func (s *Scheduler) createSchedulerRun(dbRun *database.Run) *JobRun {
-	return &JobRun{
+func (s *Scheduler) createSchedulerRun(dbRun *database.Run) *jobdb.Run {
+	return &jobdb.Run{
 		RunID:     dbRun.RunID,
 		Executor:  s.stringInterner.Intern(dbRun.Executor),
 		Running:   dbRun.Running,
@@ -662,7 +664,7 @@ func (s *Scheduler) internJobSchedulingInfoStrings(info *schedulerobjects.JobSch
 }
 
 // updateSchedulerRun updates the scheduler job run (in-place) to match the database job run
-func updateSchedulerRun(run *JobRun, dbRun *database.Run) {
+func updateSchedulerRun(run *jobdb.Run, dbRun *database.Run) {
 	run.Succeeded = dbRun.Succeeded
 	run.Failed = dbRun.Failed
 	run.Cancelled = dbRun.Cancelled
@@ -670,7 +672,7 @@ func updateSchedulerRun(run *JobRun, dbRun *database.Run) {
 }
 
 // updateSchedulerJob updates the scheduler job  (in-place) to match the database job
-func updateSchedulerJob(job *SchedulerJob, dbJob *database.Job) {
+func updateSchedulerJob(job *jobdb.Job, dbJob *database.Job) {
 	job.CancelRequested = dbJob.CancelRequested
 	job.Succeeded = dbJob.Succeeded
 	job.Cancelled = dbJob.Cancelled

@@ -1,7 +1,8 @@
-package scheduler
+package api
 
 import (
 	"context"
+	"github.com/armadaproject/armada/internal/scheduler/repository"
 	"strings"
 
 	"github.com/apache/pulsar-client-go/pulsar"
@@ -16,7 +17,6 @@ import (
 	"github.com/armadaproject/armada/internal/common/logging"
 	"github.com/armadaproject/armada/internal/common/pulsarutils"
 	"github.com/armadaproject/armada/internal/common/slices"
-	"github.com/armadaproject/armada/internal/scheduler/database"
 	"github.com/armadaproject/armada/internal/scheduler/schedulerobjects"
 	"github.com/armadaproject/armada/pkg/api"
 	"github.com/armadaproject/armada/pkg/armadaevents"
@@ -26,8 +26,8 @@ import (
 // ExecutorApi is a gRPC service that exposes functionality required by the armada executors
 type ExecutorApi struct {
 	producer             pulsar.Producer
-	jobRepository        database.JobRepository
-	executorRepository   database.ExecutorRepository
+	jobRepository        repository.JobRepository
+	executorRepository   repository.ExecutorRepository
 	allowedPriorities    []int32 // allowed priority classes
 	maxJobsPerCall       uint    // maximum number of jobs that will be leased in a single call
 	maxPulsarMessageSize uint    // maximum sizer of pulsar messages produced
@@ -35,8 +35,8 @@ type ExecutorApi struct {
 }
 
 func NewExecutorApi(producer pulsar.Producer,
-	jobRepository database.JobRepository,
-	executorRepository database.ExecutorRepository,
+	jobRepository repository.JobRepository,
+	executorRepository repository.ExecutorRepository,
 	allowedPriorities []int32,
 	maxJobsPerCall uint,
 ) (*ExecutorApi, error) {

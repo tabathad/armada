@@ -1,7 +1,8 @@
-package database
+package repository
 
 import (
 	"context"
+	"github.com/armadaproject/armada/internal/scheduler/database"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -41,7 +42,7 @@ func NewPostgresExecutorRepository(db *pgxpool.Pool) *PostgresExecutorRepository
 
 // GetExecutors returns all known executors, regardless of their last heartbeat time
 func (r *PostgresExecutorRepository) GetExecutors(ctx context.Context) ([]*schedulerobjects.Executor, error) {
-	queries := New(r.db)
+	queries := database.New(r.db)
 	requests, err := queries.SelectAllExecutors(ctx)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -60,7 +61,7 @@ func (r *PostgresExecutorRepository) GetExecutors(ctx context.Context) ([]*sched
 
 // GetLastUpdateTimes returns a map of executor name -> last heartbeat time
 func (r *PostgresExecutorRepository) GetLastUpdateTimes(ctx context.Context) (map[string]time.Time, error) {
-	queries := New(r.db)
+	queries := database.New(r.db)
 	rows, err := queries.SelectExecutorUpdateTimes(ctx)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -75,7 +76,7 @@ func (r *PostgresExecutorRepository) GetLastUpdateTimes(ctx context.Context) (ma
 
 // StoreExecutor persists the latest executor state
 func (r *PostgresExecutorRepository) StoreExecutor(ctx context.Context, executor *schedulerobjects.Executor) error {
-	queries := New(r.db)
+	queries := database.New(r.db)
 	bytes, err := proto.Marshal(executor)
 	if err != nil {
 		return errors.WithStack(err)
@@ -84,7 +85,7 @@ func (r *PostgresExecutorRepository) StoreExecutor(ctx context.Context, executor
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	err = queries.UpsertExecutor(ctx, UpsertExecutorParams{
+	err = queries.UpsertExecutor(ctx, database.UpsertExecutorParams{
 		ExecutorID:  executor.Id,
 		LastRequest: compressed,
 		UpdateTime:  executor.LastUpdateTime,

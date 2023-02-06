@@ -2,6 +2,8 @@ package scheduler
 
 import (
 	"fmt"
+	"github.com/armadaproject/armada/internal/scheduler/api"
+	"github.com/armadaproject/armada/internal/scheduler/repository"
 	"net"
 	"strings"
 	"time"
@@ -22,7 +24,6 @@ import (
 	grpcCommon "github.com/armadaproject/armada/internal/common/grpc"
 	"github.com/armadaproject/armada/internal/common/pulsarutils"
 	"github.com/armadaproject/armada/internal/common/util"
-	"github.com/armadaproject/armada/internal/scheduler/database"
 	"github.com/armadaproject/armada/pkg/executorapi"
 )
 
@@ -44,8 +45,8 @@ func Run(config Configuration) error {
 	if err != nil {
 		return errors.WithMessage(err, "Error opening connection to postgres")
 	}
-	jobRepository := database.NewPostgresJobRepository(db, int32(config.DatabaseFetchSize))
-	executorRepository := database.NewPostgresExecutorRepository(db)
+	jobRepository := repository.NewPostgresJobRepository(db, int32(config.DatabaseFetchSize))
+	executorRepository := repository.NewPostgresExecutorRepository(db)
 
 	redisClient := redis.NewUniversalClient(config.Redis.AsUniversalOptions())
 	defer func() {
@@ -54,7 +55,7 @@ func Run(config Configuration) error {
 			log.WithError(errors.WithStack(err)).Warnf("Redis client didn't close down cleanly")
 		}
 	}()
-	queueRepository := database.NewLegacyQueueRepository(redisClient)
+	queueRepository := repository.NewLegacyQueueRepository(redisClient)
 
 	//////////////////////////////////////////////////////////////////////////
 	// Pulsar
@@ -111,7 +112,7 @@ func Run(config Configuration) error {
 		return errors.WithMessage(err, "error setting up grpc server")
 	}
 	allowedPcs := allowedPrioritiesFromPriorityClasses(config.Scheduling.Preemption.PriorityClasses)
-	executorServer, err := NewExecutorApi(apiProducer, jobRepository, executorRepository, allowedPcs, config.Scheduling.MaximumJobsToSchedule)
+	executorServer, err := api.NewExecutorApi(apiProducer, jobRepository, executorRepository, allowedPcs, config.Scheduling.MaximumJobsToSchedule)
 	if err != nil {
 		return errors.WithMessage(err, "error creating executorApi")
 	}
