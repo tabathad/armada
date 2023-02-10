@@ -284,7 +284,6 @@ func testPipeline(consumer pulsar.Consumer, converter InstructionConverter[*simp
 			ReceiveTimeout: 10 * time.Second,
 			BackoffTime:    time.Second,
 		},
-		msgFilter:              NoFilter,
 		pulsarSubscriptionName: "subscription",
 		pulsarBatchDuration:    batchDuration,
 		pulsarBatchSize:        batchSize,
