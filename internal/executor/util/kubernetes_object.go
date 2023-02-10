@@ -240,6 +240,14 @@ func CreatePodFromExecutorApiJob(job *executorapi.JobRunLease, defaults *configu
 	if err != nil {
 		return nil, err
 	}
+	jobId, err := armadaevents.UlidStringFromProtoUuid(job.Job.JobId)
+	if err != nil {
+		return nil, err
+	}
+	runId, err := armadaevents.UuidStringFromProtoUuid(job.JobRunId)
+	if err != nil {
+		return nil, err
+	}
 
 	// TODO: handle the errors here
 	jobId, err := armadaevents.UlidStringFromProtoUuid(job.Job.JobId)

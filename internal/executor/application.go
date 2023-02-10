@@ -97,7 +97,7 @@ func StartUpWithContext(
 
 	if config.Application.UseExecutorApi {
 		executorApiClient = executorapi.NewExecutorApiClient(conn)
-		eventSender = reporter.NewExecutorApiEventSender(executorApiClient, 4 * 1024 * 1024)
+		eventSender = reporter.NewExecutorApiEventSender(executorApiClient, 4*1024*1024)
 	} else {
 		usageClient = api.NewUsageClient(conn)
 		queueClient = api.NewAggregatedQueueClient(conn)
@@ -144,6 +144,7 @@ func StartUpWithContext(
 		nodeInfoService,
 		usageClient,
 		config.Kubernetes.TrackedNodeLabels,
+		config.Kubernetes.NodeIdLabel,
 		config.Kubernetes.NodeReservedResources,
 	)
 
@@ -158,7 +159,14 @@ func StartUpWithContext(
 			leaseRequester,
 			clusterUtilisationService,
 			submitter,
+			config.Kubernetes.PodDefaults,
 			etcdHealthMonitor)
+		podIssueService := service.NewPodIssueService(
+			clusterContext,
+			eventReporter,
+			pendingPodChecker,
+			config.Kubernetes.StuckTerminatingPodExpiry)
+		taskManager.Register(podIssueService.HandlePodIssues, config.Task.PodIssueHandlingInterval, "pod_issue_handling")
 	} else {
 		jobLeaseService := service.NewJobLeaseService(
 			clusterContext,
