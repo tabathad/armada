@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
+	"github.com/armadaproject/armada/internal/scheduler/schedulerobjects"
 	"math/rand"
 	"time"
 
@@ -121,6 +122,16 @@ func (srv *PulsarSubmitServer) SubmitJobs(ctx context.Context, req *api.JobSubmi
 
 		es := legacySchedulerEvents
 		if assignedScheduler == schedulers.Pulsar {
+			err := srv.SubmitServer.jobRepository.StorePulsarSchedulerJobDetails([]*schedulerobjects.PulsarSchedulerJobDetails{
+				{
+					JobId:  apiJob.Id,
+					Queue:  apiJob.Queue,
+					JobSet: apiJob.JobSetId,
+				},
+			})
+			if err != nil {
+				return nil, err
+			}
 			es = pulsarSchedulerEvents
 		}
 
@@ -798,7 +809,7 @@ func (srv *PulsarSubmitServer) resolveQueueAndJobsetForJob(jobId string) (string
 	if err != nil {
 		return "", "", err
 	}
-	if len(jobs) >= 1 {
+	if len(jobs) > 0 && jobs[0].Error == nil {
 		return jobs[0].Job.GetQueue(), jobs[0].Job.GetJobSetId(), nil
 	}
 

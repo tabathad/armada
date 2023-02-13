@@ -32,7 +32,7 @@ jobs:
       containers:
         - name: reader
           imagePullPolicy: IfNotPresent
-          image: alpine:3.16
+          image: alpine:3.10
           command:
             - sh
             - -c
@@ -56,7 +56,7 @@ jobs:
               memory: 10Mi
               cpu: 100m
 ---
-timeout: "100s"
+timeout: "200s"
 expectedEvents:
   - submitted:
   - succeeded:

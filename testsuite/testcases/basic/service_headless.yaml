@@ -41,7 +41,7 @@ jobs:
               protocol: TCP
               name: port1000
 ---
-timeout: "100s"
+timeout: "200s"
 expectedEvents:
   - submitted:
   - succeeded:

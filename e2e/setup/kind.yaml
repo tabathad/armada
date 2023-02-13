@@ -4,6 +4,10 @@ name: armada-test
 nodes:
 - role: worker
   image: kindest/node:v1.24.7
+- role: worker
+  image: kindest/node:v1.24.7
+- role: worker
+  image: kindest/node:v1.24.7
 - role: control-plane
   image: kindest/node:v1.24.7
   kubeadmConfigPatches:

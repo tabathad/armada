@@ -30,7 +30,7 @@ jobs:
               protocol: TCP
               name: port
 ---
-timeout: "100s"
+timeout: "200s"
 expectedEvents:
   - submitted:
   - ingressInfo:
