@@ -431,7 +431,7 @@ func (s *Scheduler) generateUpdateMessagesFromJob(job *jobdb.Job, jobRunErrors m
 			events = append(events, jobSucceeded)
 		} else if lastRun.Failed() {
 			job = job.WithFailed(true).WithQueued(false)
-			runError := jobRunErrors[lastRun.Id()]
+			runError := getRunErrorOrDefault(lastRun.Id(), jobRunErrors)
 			jobErrors := &armadaevents.EventSequence_Event{
 				Created: s.now(),
 				Event: &armadaevents.EventSequence_Event_JobErrors{
@@ -461,6 +461,23 @@ func (s *Scheduler) generateUpdateMessagesFromJob(job *jobdb.Job, jobRunErrors m
 	}
 
 	return nil, nil
+}
+
+// getRunError returns the error for the given run out of the provided map.
+// If a run error doesn't exist, it generates a generic error
+func getRunErrorOrDefault(runId uuid.UUID, jobRunErrors map[uuid.UUID]*armadaevents.Error) *armadaevents.Error {
+	runErrors, present := jobRunErrors[runId]
+	if present {
+		return runErrors
+	}
+	return &armadaevents.Error{
+		Terminal: true,
+		Reason: &armadaevents.Error_PodError{
+			PodError: &armadaevents.PodError{
+				Message: "Unknown cause of error",
+			},
+		},
+	}
 }
 
 // expireJobsIfNecessary removes any jobs from the JobDb which are running on stale executors.
