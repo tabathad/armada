@@ -112,6 +112,8 @@ func (srv *PulsarSubmitServer) SubmitJobs(ctx context.Context, req *api.JobSubmi
 		return nil, err
 	}
 
+	pulsarJobDetails := make([]*schedulerobjects.PulsarSchedulerJobDetails, 0)
+
 	for i, apiJob := range apiJobs {
 		eventTime := time.Now()
 		assignedScheduler, ok := schedulersByJobId[apiJob.Id]
@@ -122,16 +124,11 @@ func (srv *PulsarSubmitServer) SubmitJobs(ctx context.Context, req *api.JobSubmi
 
 		es := legacySchedulerEvents
 		if assignedScheduler == schedulers.Pulsar {
-			err := srv.SubmitServer.jobRepository.StorePulsarSchedulerJobDetails([]*schedulerobjects.PulsarSchedulerJobDetails{
-				{
-					JobId:  apiJob.Id,
-					Queue:  apiJob.Queue,
-					JobSet: apiJob.JobSetId,
-				},
+			pulsarJobDetails = append(pulsarJobDetails, &schedulerobjects.PulsarSchedulerJobDetails{
+				JobId:  apiJob.Id,
+				Queue:  apiJob.Queue,
+				JobSet: apiJob.JobSetId,
 			})
-			if err != nil {
-				return nil, err
-			}
 			es = pulsarSchedulerEvents
 		}
 
@@ -200,6 +197,14 @@ func (srv *PulsarSubmitServer) SubmitJobs(ctx context.Context, req *api.JobSubmi
 					apiJob.ClientId,
 					apiJob.GetId())
 			}
+		}
+	}
+
+	if len(pulsarJobDetails) > 0 {
+		err = srv.SubmitServer.jobRepository.StorePulsarSchedulerJobDetails(pulsarJobDetails)
+		if err != nil {
+			log.WithError(err).Error("failed store pulsar job details")
+			return nil, status.Error(codes.Internal, "failed store pulsar job details")
 		}
 	}
 
