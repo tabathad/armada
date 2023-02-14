@@ -38,7 +38,6 @@ var queuedJob = jobdb.NewJob(
 	schedulingInfo,
 	false,
 	false,
-	false,
 	1)
 
 var leasedJob = jobdb.NewJob(
@@ -49,28 +48,26 @@ var leasedJob = jobdb.NewJob(
 	schedulingInfo,
 	false,
 	false,
-	false,
 	1).WithQueued(false).WithNewRun("testExecutor")
 
 // Test a single scheduler cycle
 func TestScheduler_TestCycle(t *testing.T) {
 	tests := map[string]struct {
-		initialJobs              []*jobdb.Job   // jobs in the jobdb at the start of the cycle
-		jobUpdates               []database.Job // job updates from the database
-		runUpdates               []database.Run // run updates from the database
-		staleExecutor            bool           // if true then the executorRepository will report the executor as stale
-		fetchError               bool           // if true then the jobRepository will throw an error
-		scheduleError            bool           // if true then the schedulingalgo will throw an error
-		publishError             bool           // if true the publisher will throw an error
-		expectedJobRunLeased     []string       // ids of jobs we expect to have produced leased messages
-		expectedJobRunErrors     []string       // ids of jobs we expect to have produced jobRunErrors messages
-		expectedJobErrors        []string       // ids of jobs we expect to have produced jobErrors messages
-		expectedJobCancelled     []string       // ids of jobs we expect to have  produced cancelled messages
-		expectedJobReprioritised []string       // ids of jobs we expect to have  produced reprioritised messages
-		expectedJobSucceeded     []string       // ids of jobs we expect to have  produced succeeeded messages
-		expectedLeased           []string       // ids of jobs we expected to be leased in jobdb at the end of the cycle
-		expectedQueued           []string       // ids of jobs we expected to be queued in jobdb at the end of the cycle
-		expectedTerminal         []string       // ids of jobs we expected to be terminal in jobdb at the end of the cycle
+		initialJobs          []*jobdb.Job   // jobs in the jobdb at the start of the cycle
+		jobUpdates           []database.Job // job updates from the database
+		runUpdates           []database.Run // run updates from the database
+		staleExecutor        bool           // if true then the executorRepository will report the executor as stale
+		fetchError           bool           // if true then the jobRepository will throw an error
+		scheduleError        bool           // if true then the schedulingalgo will throw an error
+		publishError         bool           // if true the publisher will throw an error
+		expectedJobRunLeased []string       // ids of jobs we expect to have produced leased messages
+		expectedJobRunErrors []string       // ids of jobs we expect to have produced jobRunErrors messages
+		expectedJobErrors    []string       // ids of jobs we expect to have produced jobErrors messages
+		expectedJobCancelled []string       // ids of jobs we expect to have  produced cancelled messages
+		expectedJobSucceeded []string       // ids of jobs we expect to have  produced succeeeded messages
+		expectedLeased       []string       // ids of jobs we expected to be leased in jobdb at the end of the cycle
+		expectedQueued       []string       // ids of jobs we expected to be queued in jobdb at the end of the cycle
+		expectedTerminal     []string       // ids of jobs we expected to be terminal in jobdb at the end of the cycle
 	}{
 		"Lease a single job already in the db": {
 			initialJobs:          []*jobdb.Job{queuedJob},
@@ -151,20 +148,6 @@ func TestScheduler_TestCycle(t *testing.T) {
 			},
 			expectedJobCancelled: []string{queuedJob.Id()},
 			expectedTerminal:     []string{queuedJob.Id()},
-		},
-		"Job reprioritised": {
-			initialJobs: []*jobdb.Job{queuedJob},
-			jobUpdates: []database.Job{
-				{
-					JobID:    queuedJob.Id(),
-					JobSet:   "testJobSet",
-					Queue:    "testQueue",
-					Priority: 2,
-					Serial:   1,
-				},
-			},
-			expectedJobReprioritised: []string{queuedJob.Id()},
-			expectedQueued:           []string{queuedJob.Id()},
 		},
 		"Lease expired": {
 			initialJobs:          []*jobdb.Job{leasedJob},
@@ -276,7 +259,6 @@ func TestScheduler_TestCycle(t *testing.T) {
 			outstandingJobErrorMessages := stringSet(tc.expectedJobErrors)
 			outstandingJobRunErrorMessages := stringSet(tc.expectedJobRunErrors)
 			outstandingCancelledMessages := stringSet(tc.expectedJobCancelled)
-			outstandingReprioritisedMessages := stringSet(tc.expectedJobReprioritised)
 			outstandingJobSucceededMessages := stringSet(tc.expectedJobSucceeded)
 			for _, event := range publisher.events {
 				for _, e := range event.Events {
@@ -315,13 +297,6 @@ func TestScheduler_TestCycle(t *testing.T) {
 						_, ok := outstandingCancelledMessages[jobId]
 						assert.True(t, ok)
 						delete(outstandingCancelledMessages, jobId)
-					} else if e.GetReprioritisedJob() != nil {
-						reprioritised := e.GetReprioritisedJob()
-						jobId, err := armadaevents.UlidStringFromProtoUuid(reprioritised.JobId)
-						require.NoError(t, err)
-						_, ok := outstandingReprioritisedMessages[jobId]
-						assert.True(t, ok)
-						delete(outstandingReprioritisedMessages, jobId)
 					} else {
 						assert.Fail(t, fmt.Sprintf("unknown event sent to publisher %+v", e))
 					}
@@ -332,7 +307,6 @@ func TestScheduler_TestCycle(t *testing.T) {
 			assert.Equal(t, 0, len(outstandingJobErrorMessages))
 			assert.Equal(t, 0, len(outstandingJobRunErrorMessages))
 			assert.Equal(t, 0, len(outstandingCancelledMessages))
-			assert.Equal(t, 0, len(outstandingReprioritisedMessages))
 			assert.Equal(t, 0, len(outstandingJobSucceededMessages))
 
 			// assert that the serials are where we expect them to be

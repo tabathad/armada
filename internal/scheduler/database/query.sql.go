@@ -118,7 +118,7 @@ func (q *Queries) MarkJobsCancelRequestedById(ctx context.Context, jobIds []stri
 }
 
 const markJobsCancelRequestedBySets = `-- name: MarkJobsCancelRequestedBySets :exec
-UPDATE jobs SET cancelled_by_jobset_requested = true WHERE job_set = ANY($1::text[])
+UPDATE jobs SET cancel_requested = true WHERE job_set = ANY($1::text[])
 `
 
 func (q *Queries) MarkJobsCancelRequestedBySets(ctx context.Context, jobSets []string) error {
@@ -354,7 +354,7 @@ func (q *Queries) SelectJobsForExecutor(ctx context.Context, arg SelectJobsForEx
 }
 
 const selectNewJobs = `-- name: SelectNewJobs :many
-SELECT job_id, job_set, queue, user_id, submitted, groups, priority, cancel_requested, cancelled, cancelled_by_jobset_requested, succeeded, failed, submit_message, scheduling_info, serial, last_modified FROM jobs WHERE serial > $1 ORDER BY serial LIMIT $2
+SELECT job_id, job_set, queue, user_id, submitted, groups, priority, cancel_requested, cancelled, succeeded, failed, submit_message, scheduling_info, serial, last_modified FROM jobs WHERE serial > $1 ORDER BY serial LIMIT $2
 `
 
 type SelectNewJobsParams struct {
@@ -381,7 +381,6 @@ func (q *Queries) SelectNewJobs(ctx context.Context, arg SelectNewJobsParams) ([
 			&i.Priority,
 			&i.CancelRequested,
 			&i.Cancelled,
-			&i.CancelledByJobsetRequested,
 			&i.Succeeded,
 			&i.Failed,
 			&i.SubmitMessage,
@@ -400,7 +399,7 @@ func (q *Queries) SelectNewJobs(ctx context.Context, arg SelectNewJobsParams) ([
 }
 
 const selectNewRuns = `-- name: SelectNewRuns :many
-SELECT run_id, job_id, created, job_set, executor, cancelled, running, succeeded, failed, returned, serial, last_modified FROM runs WHERE serial > $1 ORDER BY serial LIMIT $2
+SELECT run_id, job_id, created, job_set, executor, node, cancelled, running, succeeded, failed, returned, serial, last_modified FROM runs WHERE serial > $1 ORDER BY serial LIMIT $2
 `
 
 type SelectNewRunsParams struct {
@@ -423,6 +422,7 @@ func (q *Queries) SelectNewRuns(ctx context.Context, arg SelectNewRunsParams) ([
 			&i.Created,
 			&i.JobSet,
 			&i.Executor,
+			&i.Node,
 			&i.Cancelled,
 			&i.Running,
 			&i.Succeeded,
@@ -442,7 +442,7 @@ func (q *Queries) SelectNewRuns(ctx context.Context, arg SelectNewRunsParams) ([
 }
 
 const selectNewRunsForJobs = `-- name: SelectNewRunsForJobs :many
-SELECT run_id, job_id, created, job_set, executor, cancelled, running, succeeded, failed, returned, serial, last_modified FROM runs WHERE serial > $1 AND job_id = ANY($2::text[]) ORDER BY serial
+SELECT run_id, job_id, created, job_set, executor, node, cancelled, running, succeeded, failed, returned, serial, last_modified FROM runs WHERE serial > $1 AND job_id = ANY($2::text[]) ORDER BY serial
 `
 
 type SelectNewRunsForJobsParams struct {
@@ -465,6 +465,7 @@ func (q *Queries) SelectNewRunsForJobs(ctx context.Context, arg SelectNewRunsFor
 			&i.Created,
 			&i.JobSet,
 			&i.Executor,
+			&i.Node,
 			&i.Cancelled,
 			&i.Running,
 			&i.Succeeded,
