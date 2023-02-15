@@ -3,13 +3,13 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"golang.org/x/exp/maps"
 	"math/rand"
 	"time"
 
 	"github.com/hashicorp/go-memdb"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/clock"
 
@@ -109,11 +109,13 @@ func (l *LegacySchedulingAlgo) Schedule(ctx context.Context, txn *memdb.Txn, job
 		return nil, err
 	}
 
-	for job := leasedJobsIter.NextJobItem(); job != nil; {
+	job := leasedJobsIter.NextJobItem()
+	for job != nil {
 		if job.HasRuns() {
 			executor := job.LatestRun().Executor()
 			jobsByExecutor[executor] = append(jobsByExecutor[executor], job)
 		}
+		job = leasedJobsIter.NextJobItem()
 	}
 
 	// used to calculate fair share
@@ -218,7 +220,13 @@ func (l *LegacySchedulingAlgo) scheduleOnExecutor(
 	updatedJobs := make([]*jobdb.Job, len(jobs))
 	for i, report := range legacyScheduler.SchedulingRoundReport.SuccessfulJobSchedulingReports() {
 		job := report.Job.(*jobdb.Job)
-		job = job.WithQueued(false).WithNewRun(executor.Id, report.NodeName)
+		nodeName := ""
+		if len(report.PodSchedulingReports) > 0 {
+			nodeName = report.PodSchedulingReports[0].Node.Name
+		} else {
+			log.Warnf("Could not resolve node for Job %s as no PodSchedulingReports were present", job.Id())
+		}
+		job = job.WithQueued(false).WithNewRun(executor.Id, nodeName)
 		updatedJobs[i] = job
 	}
 	return updatedJobs, nil
@@ -226,7 +234,6 @@ func (l *LegacySchedulingAlgo) scheduleOnExecutor(
 
 // constructNodeDb constructs a node db with all jobs bound to it
 func (l *LegacySchedulingAlgo) constructNodeDb(nodes []*schedulerobjects.Node, jobs []*jobdb.Job, priorityClasses map[string]configuration.PriorityClass) (*NodeDb, error) {
-
 	nodesByName := make(map[string]*schedulerobjects.Node, len(nodes))
 	for _, node := range nodes {
 		// Clear out node
