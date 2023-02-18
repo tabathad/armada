@@ -92,8 +92,7 @@ scheduling:
         maximalResourceFractionPerQueue:
           memory: 0.99
           cpu: 0.99
-    # Default to empty PC to not require PCs be set up in worker clusters.
-    defaultPriorityClass: ""
+    defaultPriorityClass: "armada-default"
   maxQueueReportsToStore: 1000
   MaxJobReportsToStore: 100000
   defaultJobLimits:
