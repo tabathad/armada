@@ -6,6 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/armadaproject/armada/internal/common"
+
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/go-redis/redis"
 	"github.com/google/uuid"
@@ -149,6 +153,20 @@ func Run(config Configuration) error {
 		return errors.WithMessage(err, "error creating scheduler")
 	}
 	services = append(services, func() error { return scheduler.Run(ctx) })
+
+	//////////////////////////////////////////////////////////////////////////
+	// Metrics
+	//////////////////////////////////////////////////////////////////////////
+	poolAssigner := NewPoolAssigner(config.Scheduling.ExecutorTimeout, config.Scheduling, executorRepository)
+	metricsCollector := NewMetricsCollector(
+		scheduler.jobDb,
+		queueRepository,
+		poolAssigner,
+		config.Metrics.RefreshInterval)
+	prometheus.MustRegister(metricsCollector)
+	services = append(services, func() error { return metricsCollector.Run(ctx) })
+	shutdownMetricServer := common.ServeMetrics(config.Metrics.Port)
+	defer shutdownMetricServer()
 
 	// start all services
 	for _, service := range services {

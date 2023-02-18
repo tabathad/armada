@@ -149,7 +149,7 @@ func (srv *SubmitChecker) check(reqs []*schedulerobjects.PodRequirements) (bool,
 	var sb strings.Builder
 	for id, executor := range executorById {
 		nodeDb := executor.nodeDb
-		txn := nodeDb.db.Txn(true)
+		txn := nodeDb.Db.Txn(true)
 		reports, ok, err := nodeDb.ScheduleManyWithTxn(txn, reqs)
 		txn.Abort()
 

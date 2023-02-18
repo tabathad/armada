@@ -684,7 +684,7 @@ type LegacyScheduler struct {
 	SchedulingConstraints
 	SchedulingRoundReport *SchedulingRoundReport
 	CandidateGangIterator *CandidateGangIterator
-	// Contains all nodes to be considered for scheduling.
+	// Contains all nodes to be considered for
 	// Used for matching pods with nodes.
 	NodeDb *NodeDb
 }
@@ -913,17 +913,17 @@ func NewLegacyScheduler(
 ) (*LegacyScheduler, error) {
 	if ResourceListAsWeightedApproximateFloat64(constraints.ResourceScarcity, constraints.TotalResources) == 0 {
 		// This refers to resources available across all clusters, i.e.,
-		// it may include resources not currently considered for scheduling.
+		// it may include resources not currently considered for
 		return nil, errors.Errorf(
 			"no resources with non-zero weight available for scheduling on any cluster: resource scarcity %v, total resources %v",
 			constraints.ResourceScarcity, constraints.TotalResources,
 		)
 	}
-	if ResourceListAsWeightedApproximateFloat64(constraints.ResourceScarcity, nodeDb.totalResources) == 0 {
+	if ResourceListAsWeightedApproximateFloat64(constraints.ResourceScarcity, nodeDb.TotalResources) == 0 {
 		// This refers to the resources currently considered for schedling.
 		return nil, errors.Errorf(
 			"no resources with non-zero weight available for scheduling in NodeDb: resource scarcity %v, total resources %v",
-			constraints.ResourceScarcity, nodeDb.totalResources,
+			constraints.ResourceScarcity, nodeDb.TotalResources,
 		)
 	}
 
@@ -1192,7 +1192,7 @@ func Reschedule(
 	// Jobs assigned to a node that weren't present earlier are scheduled.
 	//
 	// Compare the NodeJobDiff with expected preempted/scheduled jobs to ensure it's consistent.
-	// This is only to validate that nothing unexpected happened during scheduling.
+	// This is only to validate that nothing unexpected happened during
 	preempted, scheduled, err := NodeJobDiff(txn, nodeDb.Txn(false))
 	if err != nil {
 		return nil, nil, nil, nil, err
