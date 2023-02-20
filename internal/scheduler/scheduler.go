@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"github.com/armadaproject/armada/internal/scheduler/scheduling"
 	"time"
 
 	"github.com/armadaproject/armada/internal/scheduler/jobdb"
@@ -35,7 +36,7 @@ type Scheduler struct {
 	// Used to determine whether a cluster is active
 	executorRepository database.ExecutorRepository
 	// Responsible for assigning jobs to nodes
-	schedulingAlgo SchedulingAlgo
+	schedulingAlgo scheduling.SchedulingAlgo
 	// Tells us if we are leader. Only the leader may schedule jobs
 	leaderController LeaderController
 	// We intern strings to save memory
@@ -63,7 +64,7 @@ type Scheduler struct {
 func NewScheduler(
 	jobRepository database.JobRepository,
 	executorRepository database.ExecutorRepository,
-	schedulingAlgo SchedulingAlgo,
+	schedulingAlgo scheduling.SchedulingAlgo,
 	leaderController LeaderController,
 	publisher Publisher,
 	stringInterner *util.StringInterner,

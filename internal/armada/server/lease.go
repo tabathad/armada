@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	scheduling2 "github.com/armadaproject/armada/internal/scheduler/scheduling"
 	"io"
 	"math"
 	"sync/atomic"
@@ -36,7 +37,6 @@ import (
 	"github.com/armadaproject/armada/internal/common/schedulers"
 	armadaslices "github.com/armadaproject/armada/internal/common/slices"
 	"github.com/armadaproject/armada/internal/common/util"
-	"github.com/armadaproject/armada/internal/scheduler"
 	"github.com/armadaproject/armada/internal/scheduler/database"
 	"github.com/armadaproject/armada/internal/scheduler/schedulerobjects"
 	"github.com/armadaproject/armada/pkg/api"
@@ -54,10 +54,10 @@ type AggregatedQueueServer struct {
 	decompressorPool         *pool.ObjectPool
 	clock                    clock.Clock
 	// For storing reports of scheduling attempts.
-	SchedulingReportsRepository *scheduler.SchedulingReportsRepository
+	SchedulingReportsRepository *scheduling2.SchedulingReportsRepository
 	// Stores the most recent NodeDb for each executor.
 	// Used to check if a job could ever be scheduled at job submit time.
-	SubmitChecker *scheduler.SubmitChecker
+	SubmitChecker *scheduling2.SubmitChecker
 	// Necessary to generate preempted messages.
 	pulsarProducer       pulsar.Producer
 	maxPulsarMessageSize uint
@@ -267,12 +267,12 @@ func (repo *SchedulerJobRepositoryAdapter) GetQueueJobIds(queue string) ([]strin
 	return repo.r.GetQueueJobIds(queue)
 }
 
-func (repo *SchedulerJobRepositoryAdapter) GetExistingJobsByIds(ids []string) ([]scheduler.LegacySchedulerJob, error) {
+func (repo *SchedulerJobRepositoryAdapter) GetExistingJobsByIds(ids []string) ([]scheduling2.LegacySchedulerJob, error) {
 	jobs, err := repo.r.GetExistingJobsByIds(ids)
 	if err != nil {
 		return nil, err
 	}
-	rv := make([]scheduler.LegacySchedulerJob, len(jobs))
+	rv := make([]scheduling2.LegacySchedulerJob, len(jobs))
 	for i, job := range jobs {
 		rv[i] = job
 	}
@@ -363,10 +363,10 @@ func (q *AggregatedQueueServer) getJobs(ctx context.Context, req *api.StreamingL
 
 		skipNode := false
 		for _, job := range jobs {
-			podReq := scheduler.PodRequirementFromLegacySchedulerJob(job, q.schedulingConfig.Preemption.PriorityClasses)
+			podReq := scheduling2.PodRequirementFromLegacySchedulerJob(job, q.schedulingConfig.Preemption.PriorityClasses)
 
 			// Bind pod to node, thus ensuring resources are marked allocated on the node.
-			node, err = scheduler.BindPodToNode(podReq, node)
+			node, err = scheduling2.BindPodToNode(podReq, node)
 			if err != nil {
 				logging.WithStacktrace(log, err).Warnf(
 					"skipping node %s from executor %s: failed to bind job %s to node",
@@ -385,7 +385,7 @@ func (q *AggregatedQueueServer) getJobs(ctx context.Context, req *api.StreamingL
 	if len(indexedResources) == 0 {
 		indexedResources = []string{"cpu", "memory"}
 	}
-	nodeDb, err := scheduler.NewNodeDb(
+	nodeDb, err := scheduling2.NewNodeDb(
 		q.schedulingConfig.Preemption.PriorityClasses,
 		indexedResources,
 		q.schedulingConfig.IndexedTaints,
@@ -440,7 +440,7 @@ func (q *AggregatedQueueServer) getJobs(ctx context.Context, req *api.StreamingL
 		ctx, cancel = context.WithDeadline(ctx, deadline.Add(-3*time.Second))
 		defer cancel()
 	}
-	constraints := scheduler.SchedulingConstraintsFromSchedulingConfig(
+	constraints := scheduling2.SchedulingConstraintsFromSchedulingConfig(
 		req.ClusterId,
 		req.Pool,
 		schedulerobjects.ResourceList{Resources: req.MinimumJobSize},
@@ -449,11 +449,11 @@ func (q *AggregatedQueueServer) getJobs(ctx context.Context, req *api.StreamingL
 	)
 
 	// var schedulingRoundReport *scheduler.SchedulingRoundReport
-	var preemptedJobs []scheduler.LegacySchedulerJob
-	var scheduledJobs []scheduler.LegacySchedulerJob
+	var preemptedJobs []scheduling2.LegacySchedulerJob
+	var scheduledJobs []scheduling2.LegacySchedulerJob
 	var nodesByJobId map[string]*schedulerobjects.Node
 	if q.schedulingConfig.Preemption.PreemptToFairShare {
-		preemptedJobs, scheduledJobs, nodesByJobId, _, err = scheduler.Reschedule(
+		preemptedJobs, scheduledJobs, nodesByJobId, _, err = scheduling2.Reschedule(
 			ctx,
 			&SchedulerJobRepositoryAdapter{
 				r: q.jobRepository,
@@ -471,9 +471,9 @@ func (q *AggregatedQueueServer) getJobs(ctx context.Context, req *api.StreamingL
 			return nil, err
 		}
 	} else {
-		schedulerQueues := make([]*scheduler.Queue, len(activeQueues))
+		schedulerQueues := make([]*scheduling2.Queue, len(activeQueues))
 		for i, apiQueue := range activeQueues {
-			jobIterator, err := scheduler.NewQueuedJobsIterator(
+			jobIterator, err := scheduling2.NewQueuedJobsIterator(
 				ctx,
 				apiQueue.Name,
 				&SchedulerJobRepositoryAdapter{
@@ -483,7 +483,7 @@ func (q *AggregatedQueueServer) getJobs(ctx context.Context, req *api.StreamingL
 			if err != nil {
 				return nil, err
 			}
-			queue, err := scheduler.NewQueue(
+			queue, err := scheduling2.NewQueue(
 				apiQueue.Name,
 				priorityFactorByActiveQueue[apiQueue.Name],
 				jobIterator,
@@ -493,7 +493,7 @@ func (q *AggregatedQueueServer) getJobs(ctx context.Context, req *api.StreamingL
 			}
 			schedulerQueues[i] = queue
 		}
-		sched, err := scheduler.NewLegacyScheduler(
+		sched, err := scheduling2.NewLegacyScheduler(
 			ctx,
 			*constraints,
 			q.schedulingConfig,
@@ -658,17 +658,17 @@ func (q *AggregatedQueueServer) getJobs(ctx context.Context, req *api.StreamingL
 
 	// Update the usage report in-place to account for any leased jobs and write it back into Redis.
 	// This ensures resources of leased jobs are accounted for without needing to wait for feedback from the executor.
-	aggregatedUsageByQueue = scheduler.UpdateUsage(
+	aggregatedUsageByQueue = scheduling2.UpdateUsage(
 		aggregatedUsageByQueue,
 		preemptedJobs,
 		q.schedulingConfig.Preemption.PriorityClasses,
-		scheduler.Subtract,
+		scheduling2.Subtract,
 	)
-	aggregatedUsageByQueue = scheduler.UpdateUsage(
+	aggregatedUsageByQueue = scheduling2.UpdateUsage(
 		aggregatedUsageByQueue,
 		successfullyLeasedApiJobs,
 		q.schedulingConfig.Preemption.PriorityClasses,
-		scheduler.Add,
+		scheduling2.Add,
 	)
 	executorReport, ok := reportsByExecutor[req.ClusterId]
 	if !ok || executorReport.ResourcesByQueue == nil {

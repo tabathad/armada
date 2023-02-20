@@ -3,6 +3,7 @@ package armada
 import (
 	"context"
 	"fmt"
+	scheduling2 "github.com/armadaproject/armada/internal/scheduler/scheduling"
 	"net"
 	"time"
 
@@ -31,7 +32,6 @@ import (
 	"github.com/armadaproject/armada/internal/common/pulsarutils"
 	"github.com/armadaproject/armada/internal/common/task"
 	"github.com/armadaproject/armada/internal/common/util"
-	"github.com/armadaproject/armada/internal/scheduler"
 	schedulerdb "github.com/armadaproject/armada/internal/scheduler/database"
 	"github.com/armadaproject/armada/internal/scheduler/schedulerobjects"
 	"github.com/armadaproject/armada/pkg/api"
@@ -138,7 +138,7 @@ func Serve(ctx context.Context, config *configuration.ArmadaConfig, healthChecks
 	pulsarExecutorRepo := schedulerdb.NewRedisExecutorRepository(db, "pulsar")
 	legacyExecutorRepo := schedulerdb.NewRedisExecutorRepository(db, "legacy")
 
-	pulsarSchedulerSubmitChecker := scheduler.NewSubmitChecker(
+	pulsarSchedulerSubmitChecker := scheduling2.NewSubmitChecker(
 		30*time.Minute,
 		config.Scheduling,
 		pulsarExecutorRepo,
@@ -146,7 +146,7 @@ func Serve(ctx context.Context, config *configuration.ArmadaConfig, healthChecks
 	services = append(services, func() error {
 		return pulsarSchedulerSubmitChecker.Run(ctx)
 	})
-	legacySchedulerSubmitChecker := scheduler.NewSubmitChecker(
+	legacySchedulerSubmitChecker := scheduling2.NewSubmitChecker(
 		30*time.Minute,
 		config.Scheduling,
 		legacyExecutorRepo,
@@ -273,7 +273,7 @@ func Serve(ctx context.Context, config *configuration.ArmadaConfig, healthChecks
 		legacyExecutorRepo,
 	)
 	if config.Scheduling.MaxQueueReportsToStore > 0 || config.Scheduling.MaxJobReportsToStore > 0 {
-		aggregatedQueueServer.SchedulingReportsRepository = scheduler.NewSchedulingReportsRepository(
+		aggregatedQueueServer.SchedulingReportsRepository = scheduling2.NewSchedulingReportsRepository(
 			config.Scheduling.MaxQueueReportsToStore,
 			config.Scheduling.MaxJobReportsToStore,
 		)

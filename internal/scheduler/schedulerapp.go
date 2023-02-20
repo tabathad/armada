@@ -2,6 +2,8 @@ package scheduler
 
 import (
 	"fmt"
+	"github.com/armadaproject/armada/internal/scheduler/config"
+	"github.com/armadaproject/armada/internal/scheduler/scheduling"
 	"net"
 	"strings"
 	"time"
@@ -26,7 +28,7 @@ import (
 )
 
 // Run sets up a Scheduler application and runs it until a SIGTERM is received
-func Run(config Configuration) error {
+func Run(config config.Configuration) error {
 	g, ctx := errgroup.WithContext(app.CreateContextWithShutdown())
 
 	// List of services to run concurrently.
@@ -136,7 +138,7 @@ func Run(config Configuration) error {
 	if err != nil {
 		return errors.WithMessage(err, "error creating string interner")
 	}
-	schedulingAlgo := NewLegacySchedulingAlgo(config.Scheduling, executorRepository, queueRepository)
+	schedulingAlgo := scheduling.NewLegacySchedulingAlgo(config.Scheduling, executorRepository, queueRepository)
 	scheduler, err := NewScheduler(jobRepository,
 		executorRepository,
 		schedulingAlgo,
@@ -159,7 +161,7 @@ func Run(config Configuration) error {
 	return g.Wait()
 }
 
-func createLeaderController(config LeaderConfig) (LeaderController, error) {
+func createLeaderController(config config.LeaderConfig) (LeaderController, error) {
 	switch mode := strings.ToLower(config.Mode); mode {
 	case "standalone":
 		log.Infof("Scheduler will run in standalone mode")
@@ -174,7 +176,7 @@ func createLeaderController(config LeaderConfig) (LeaderController, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "Error creating kubernetes client")
 		}
-		return NewKubernetesLeaderController(LeaderConfig{}, clientSet.CoordinationV1()), nil
+		return NewKubernetesLeaderController(config.LeaderConfig{}, clientSet.CoordinationV1()), nil
 	default:
 		return nil, errors.Errorf("%s is not a value leader mode", config.Mode)
 	}

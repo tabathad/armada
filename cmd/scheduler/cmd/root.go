@@ -1,12 +1,12 @@
 package cmd
 
 import (
+	"github.com/armadaproject/armada/internal/scheduler/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/armadaproject/armada/internal/common"
 	commonconfig "github.com/armadaproject/armada/internal/common/config"
-	"github.com/armadaproject/armada/internal/scheduler"
 )
 
 const (
@@ -37,8 +37,8 @@ func RootCmd() *cobra.Command {
 	return cmd
 }
 
-func loadConfig() (scheduler.Configuration, error) {
-	var config scheduler.Configuration
+func loadConfig() (config.Configuration, error) {
+	var config config.Configuration
 	userSpecifiedConfigs := viper.GetStringSlice(CustomConfigLocation)
 
 	common.LoadConfig(&config, "./config/scheduler", userSpecifiedConfigs)

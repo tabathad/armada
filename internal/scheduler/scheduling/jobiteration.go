@@ -1,8 +1,7 @@
-package scheduler
+package scheduling
 
 import (
 	"context"
-
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"golang.org/x/sync/errgroup"

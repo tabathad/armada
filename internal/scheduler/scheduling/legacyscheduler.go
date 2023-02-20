@@ -1,4 +1,4 @@
-package scheduler
+package scheduling
 
 import (
 	"container/heap"
@@ -26,6 +26,7 @@ import (
 	armadamaps "github.com/armadaproject/armada/internal/common/maps"
 	armadaresource "github.com/armadaproject/armada/internal/common/resource"
 	armadaslices "github.com/armadaproject/armada/internal/common/slices"
+	"github.com/armadaproject/armada/internal/scheduler/config"
 	"github.com/armadaproject/armada/internal/scheduler/schedulerobjects"
 	"github.com/armadaproject/armada/pkg/armadaevents"
 )
@@ -775,8 +776,8 @@ func EvictPreemptible(
 			// Add annotations to this pod that indicate to the scheduler
 			// - that this pod was evicted and
 			// - which node it was evicted from.
-			annotations[TargetNodeIdAnnotation] = node.Id
-			annotations[IsEvictedAnnotation] = "true"
+			annotations[config.TargetNodeIdAnnotation] = node.Id
+			annotations[config.IsEvictedAnnotation] = "true"
 
 			// Add an empty allocation for this queue.
 			// To make the scheduler avoid this node when scheduling pods from other queues.
@@ -842,8 +843,8 @@ func EvictOversubscribed(
 			// Add annotations to this pod that indicate to the scheduler
 			// - that this pod was evicted and
 			// - which node it was evicted from.
-			annotations[TargetNodeIdAnnotation] = node.Id
-			annotations[IsEvictedAnnotation] = "true"
+			annotations[config.TargetNodeIdAnnotation] = node.Id
+			annotations[config.IsEvictedAnnotation] = "true"
 
 			// TODO: This is only necessary for jobs not shceduled in this cycle.
 			// Since jobs scheduled in this cycle can be rescheduled onto another node without triggering a preemption.
@@ -1393,11 +1394,11 @@ func (sched *LegacyScheduler) Schedule() ([]LegacySchedulerJob, error) {
 }
 
 func isEvictedJob(job LegacySchedulerJob) bool {
-	return job.GetAnnotations()[IsEvictedAnnotation] == "true"
+	return job.GetAnnotations()[config.IsEvictedAnnotation] == "true"
 }
 
 func targetNodeIdFromLegacySchedulerJob(job LegacySchedulerJob) (string, bool) {
-	nodeId, ok := job.GetAnnotations()[TargetNodeIdAnnotation]
+	nodeId, ok := job.GetAnnotations()[config.TargetNodeIdAnnotation]
 	return nodeId, ok
 }
 
@@ -1466,8 +1467,8 @@ func PodRequirementFromLegacySchedulerJob[E LegacySchedulerJob](job E, priorityC
 		req.Annotations = make(map[string]string)
 	}
 	maps.Copy(req.Annotations, job.GetAnnotations())
-	req.Annotations[JobIdAnnotation] = job.GetId()
-	req.Annotations[QueueAnnotation] = job.GetQueue()
+	req.Annotations[config.JobIdAnnotation] = job.GetId()
+	req.Annotations[config.QueueAnnotation] = job.GetQueue()
 	return req
 }
 

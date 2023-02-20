@@ -1,4 +1,4 @@
-package scheduler
+package scheduling
 
 import (
 	"fmt"
@@ -16,6 +16,7 @@ import (
 	"github.com/armadaproject/armada/internal/armada/configuration"
 	"github.com/armadaproject/armada/internal/common/armadaerrors"
 	armadaresource "github.com/armadaproject/armada/internal/common/resource"
+	"github.com/armadaproject/armada/internal/scheduler/config"
 	"github.com/armadaproject/armada/internal/scheduler/schedulerobjects"
 )
 
@@ -290,7 +291,7 @@ func (nodeDb *NodeDb) SelectNodeForPodWithTxn(txn *memdb.Txn, req *schedulerobje
 	}
 
 	// If the targetNodeIdAnnocation is set, consider only that node.
-	if nodeId, ok := req.Annotations[TargetNodeIdAnnotation]; ok {
+	if nodeId, ok := req.Annotations[config.TargetNodeIdAnnotation]; ok {
 		if it, err := txn.Get("nodes", "id", nodeId); err != nil {
 			return nil, errors.WithStack(err)
 		} else {
@@ -455,11 +456,11 @@ func UnbindPodFromNode(req *schedulerobjects.PodRequirements, node *schedulerobj
 }
 
 func JobIdFromPodRequirements(req *schedulerobjects.PodRequirements) (string, error) {
-	return valueFromPodRequirements(req, JobIdAnnotation)
+	return valueFromPodRequirements(req, config.JobIdAnnotation)
 }
 
 func QueueFromPodRequirements(req *schedulerobjects.PodRequirements) (string, error) {
-	return valueFromPodRequirements(req, QueueAnnotation)
+	return valueFromPodRequirements(req, config.QueueAnnotation)
 }
 
 func valueFromPodRequirements(req *schedulerobjects.PodRequirements, key string) (string, error) {

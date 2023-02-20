@@ -1,8 +1,9 @@
-package scheduler
+package scheduling
 
 import (
 	"bytes"
 	"container/heap"
+	"github.com/armadaproject/armada/internal/scheduler"
 	"testing"
 
 	"github.com/hashicorp/go-memdb"
@@ -20,13 +21,13 @@ func TestNodesIterator(t *testing.T) {
 		Nodes []*schedulerobjects.Node
 	}{
 		"1 node": {
-			Nodes: testNCpuNode(1, testPriorities),
+			Nodes: scheduler.testNCpuNode(1, scheduler.testPriorities),
 		},
 		"0 nodes": {
-			Nodes: testNCpuNode(0, testPriorities),
+			Nodes: scheduler.testNCpuNode(0, scheduler.testPriorities),
 		},
 		"3 nodes": {
-			Nodes: testNCpuNode(3, testPriorities),
+			Nodes: scheduler.testNCpuNode(3, scheduler.testPriorities),
 		},
 	}
 	for name, tc := range tests {
@@ -35,7 +36,7 @@ func TestNodesIterator(t *testing.T) {
 			for i, node := range tc.Nodes {
 				indexById[node.Id] = i
 			}
-			nodeDb, err := createNodeDb(tc.Nodes)
+			nodeDb, err := scheduler.createNodeDb(tc.Nodes)
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -62,12 +63,12 @@ func TestNodesIterator(t *testing.T) {
 }
 
 func TestNodePairIterator(t *testing.T) {
-	nodes := testCluster()
+	nodes := scheduler.testCluster()
 	for i, c := range []string{"A", "B", "C"} {
 		nodes[i].Id = c
 	}
 
-	db, err := memdb.NewMemDB(nodeDbSchema(testPriorities, testResources))
+	db, err := memdb.NewMemDB(nodeDbSchema(scheduler.testPriorities, scheduler.testResources))
 	require.NoError(t, err)
 
 	txn := db.Txn(true)
@@ -246,7 +247,7 @@ func TestNodeTypeResourceIterator(t *testing.T) {
 			NodeTypeId:    "foo",
 			Resource:      "cpu",
 			Priority:      1,
-			Nodes:         testCluster(),
+			Nodes:         scheduler.testCluster(),
 			ExpectedOrder: []int{0, 1},
 		},
 		"NodeType bar": {
@@ -254,7 +255,7 @@ func TestNodeTypeResourceIterator(t *testing.T) {
 			NodeTypeId:    "bar",
 			Resource:      "cpu",
 			Priority:      1,
-			Nodes:         testCluster(),
+			Nodes:         scheduler.testCluster(),
 			ExpectedOrder: []int{2},
 		},
 		"NodeType foo, cpu lower bound": {
@@ -263,7 +264,7 @@ func TestNodeTypeResourceIterator(t *testing.T) {
 			Resource:               "cpu",
 			Priority:               2,
 			RequiredResourceAmount: resource.MustParse("6"),
-			Nodes:                  testCluster(),
+			Nodes:                  scheduler.testCluster(),
 			ExpectedOrder:          []int{1},
 		},
 		"dominantQueue": {
@@ -272,18 +273,18 @@ func TestNodeTypeResourceIterator(t *testing.T) {
 			Resource:               "cpu",
 			Priority:               1,
 			RequiredResourceAmount: resource.MustParse("0"),
-			Nodes: withPodReqsNodes(
+			Nodes: scheduler.withPodReqsNodes(
 				map[int][]*schedulerobjects.PodRequirements{
 					0: append(
-						testNSmallCpuJob("A", 0, 2),
-						testNSmallCpuJob("B", 0, 1)...,
+						scheduler.testNSmallCpuJob("A", 0, 2),
+						scheduler.testNSmallCpuJob("B", 0, 1)...,
 					),
 					1: append(
-						testNSmallCpuJob("A", 0, 3),
-						testNSmallCpuJob("B", 0, 3)...,
+						scheduler.testNSmallCpuJob("A", 0, 3),
+						scheduler.testNSmallCpuJob("B", 0, 3)...,
 					),
 				},
-				testCluster(),
+				scheduler.testCluster(),
 			),
 			ExpectedOrder: []int{0, 1},
 		},
@@ -294,15 +295,15 @@ func TestNodeTypeResourceIterator(t *testing.T) {
 			Resource:               "cpu",
 			Priority:               1,
 			RequiredResourceAmount: resource.MustParse("0"),
-			Nodes: withPodReqsNodes(
+			Nodes: scheduler.withPodReqsNodes(
 				map[int][]*schedulerobjects.PodRequirements{
 					0: append(
-						testNSmallCpuJob("A", 0, 2),
-						testNSmallCpuJob("B", 0, 1)...,
+						scheduler.testNSmallCpuJob("A", 0, 2),
+						scheduler.testNSmallCpuJob("B", 0, 1)...,
 					),
-					1: testNSmallCpuJob("A", 0, 2),
+					1: scheduler.testNSmallCpuJob("A", 0, 2),
 				},
-				testCluster(),
+				scheduler.testCluster(),
 			),
 			ExpectedOrder: []int{1},
 		},
@@ -312,14 +313,14 @@ func TestNodeTypeResourceIterator(t *testing.T) {
 			Resource:               "cpu",
 			Priority:               1,
 			RequiredResourceAmount: resource.MustParse("0"),
-			Nodes: withPodReqsNodes(
+			Nodes: scheduler.withPodReqsNodes(
 				map[int][]*schedulerobjects.PodRequirements{
 					0: append(
-						testNSmallCpuJob("A", 0, 2),
-						testNSmallCpuJob("B", 0, 1)...,
+						scheduler.testNSmallCpuJob("A", 0, 2),
+						scheduler.testNSmallCpuJob("B", 0, 1)...,
 					),
 				},
-				testCluster(),
+				scheduler.testCluster(),
 			),
 			ExpectedOrder: []int{1},
 		},
@@ -330,21 +331,21 @@ func TestNodeTypeResourceIterator(t *testing.T) {
 			Resource:               "cpu",
 			Priority:               1,
 			RequiredResourceAmount: resource.MustParse("0"),
-			Nodes: withPodReqsNodes(
+			Nodes: scheduler.withPodReqsNodes(
 				map[int][]*schedulerobjects.PodRequirements{
 					0: append(
-						testNSmallCpuJob("A", 0, 2),
-						testNSmallCpuJob("B", 0, 1)...,
+						scheduler.testNSmallCpuJob("A", 0, 2),
+						scheduler.testNSmallCpuJob("B", 0, 1)...,
 					),
 				},
-				testCluster(),
+				scheduler.testCluster(),
 			),
 			ExpectedOrder: []int{1},
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			db, err := memdb.NewMemDB(nodeDbSchema(testPriorities, testResources))
+			db, err := memdb.NewMemDB(nodeDbSchema(scheduler.testPriorities, scheduler.testResources))
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -397,7 +398,7 @@ func TestNodeTypesResourceIterator(t *testing.T) {
 			NodeTypes:     []string{"foo"},
 			Resource:      "cpu",
 			Priority:      1,
-			Nodes:         testCluster(),
+			Nodes:         scheduler.testCluster(),
 			ExpectedOrder: []int{0, 1},
 		},
 		"NodeType bar": {
@@ -405,7 +406,7 @@ func TestNodeTypesResourceIterator(t *testing.T) {
 			NodeTypes:     []string{"bar"},
 			Resource:      "cpu",
 			Priority:      1,
-			Nodes:         testCluster(),
+			Nodes:         scheduler.testCluster(),
 			ExpectedOrder: []int{2},
 		},
 		"NodeType foo, cpu lower bound": {
@@ -414,7 +415,7 @@ func TestNodeTypesResourceIterator(t *testing.T) {
 			Resource:               "cpu",
 			Priority:               2,
 			RequiredResourceAmount: resource.MustParse("6"),
-			Nodes:                  testCluster(),
+			Nodes:                  scheduler.testCluster(),
 			ExpectedOrder:          []int{1},
 		},
 		"NodeType foo and bar": {
@@ -422,7 +423,7 @@ func TestNodeTypesResourceIterator(t *testing.T) {
 			NodeTypes:     []string{"foo", "bar"},
 			Resource:      "cpu",
 			Priority:      1,
-			Nodes:         testCluster(),
+			Nodes:         scheduler.testCluster(),
 			ExpectedOrder: []int{0, 1, 2},
 		},
 		"NodeType foo and bar, cpu lower bound": {
@@ -431,7 +432,7 @@ func TestNodeTypesResourceIterator(t *testing.T) {
 			Resource:               "cpu",
 			Priority:               2,
 			RequiredResourceAmount: resource.MustParse("6"),
-			Nodes:                  testCluster(),
+			Nodes:                  scheduler.testCluster(),
 			ExpectedOrder:          []int{1, 2},
 		},
 		"dominantQueue": {
@@ -440,22 +441,22 @@ func TestNodeTypesResourceIterator(t *testing.T) {
 			Resource:               "cpu",
 			Priority:               1,
 			RequiredResourceAmount: resource.MustParse("0"),
-			Nodes: withPodReqsNodes(
+			Nodes: scheduler.withPodReqsNodes(
 				map[int][]*schedulerobjects.PodRequirements{
 					0: append(
-						testNSmallCpuJob("A", 0, 2),
-						testNSmallCpuJob("B", 0, 1)...,
+						scheduler.testNSmallCpuJob("A", 0, 2),
+						scheduler.testNSmallCpuJob("B", 0, 1)...,
 					),
 					1: append(
-						testNSmallCpuJob("A", 0, 3),
-						testNSmallCpuJob("B", 0, 3)...,
+						scheduler.testNSmallCpuJob("A", 0, 3),
+						scheduler.testNSmallCpuJob("B", 0, 3)...,
 					),
 					2: append(
-						testNSmallCpuJob("A", 0, 1),
-						testNSmallCpuJob("B", 0, 2)...,
+						scheduler.testNSmallCpuJob("A", 0, 1),
+						scheduler.testNSmallCpuJob("B", 0, 2)...,
 					),
 				},
-				testCluster(),
+				scheduler.testCluster(),
 			),
 			ExpectedOrder: []int{0, 1},
 		},
@@ -466,26 +467,26 @@ func TestNodeTypesResourceIterator(t *testing.T) {
 			Resource:               "cpu",
 			Priority:               1,
 			RequiredResourceAmount: resource.MustParse("0"),
-			Nodes: withPodReqsNodes(
+			Nodes: scheduler.withPodReqsNodes(
 				map[int][]*schedulerobjects.PodRequirements{
 					0: append(
-						testNSmallCpuJob("A", 0, 2),
-						testNSmallCpuJob("B", 0, 1)...,
+						scheduler.testNSmallCpuJob("A", 0, 2),
+						scheduler.testNSmallCpuJob("B", 0, 1)...,
 					),
-					1: testNSmallCpuJob("A", 0, 3),
+					1: scheduler.testNSmallCpuJob("A", 0, 3),
 					2: append(
-						testNSmallCpuJob("A", 0, 1),
-						testNSmallCpuJob("B", 0, 2)...,
+						scheduler.testNSmallCpuJob("A", 0, 1),
+						scheduler.testNSmallCpuJob("B", 0, 2)...,
 					),
 				},
-				testCluster(),
+				scheduler.testCluster(),
 			),
 			ExpectedOrder: []int{1},
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			db, err := memdb.NewMemDB(nodeDbSchema(testPriorities, testResources))
+			db, err := memdb.NewMemDB(nodeDbSchema(scheduler.testPriorities, scheduler.testResources))
 			if !assert.NoError(t, err) {
 				return
 			}

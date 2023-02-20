@@ -1,13 +1,12 @@
 package validation
 
 import (
+	"github.com/armadaproject/armada/internal/scheduler/scheduling"
 	"github.com/pkg/errors"
 
 	"github.com/armadaproject/armada/internal/armada/configuration"
 	"github.com/armadaproject/armada/internal/common/armadaerrors"
 	"github.com/armadaproject/armada/internal/common/util"
-	"github.com/armadaproject/armada/internal/scheduler"
-
 	"github.com/armadaproject/armada/pkg/api"
 )
 
@@ -32,7 +31,7 @@ func validateGangs(jobs []*api.Job, gangIdAnnotation, gangCardinalityAnnotation 
 	})
 	for i, job := range jobs {
 		annotations := job.Annotations
-		gangId, gangCardinality, isGangJob, err := scheduler.GangIdAndCardinalityFromAnnotations(annotations, gangIdAnnotation, gangCardinalityAnnotation)
+		gangId, gangCardinality, isGangJob, err := scheduling.GangIdAndCardinalityFromAnnotations(annotations, gangIdAnnotation, gangCardinalityAnnotation)
 		if err != nil {
 			return errors.WithMessagef(err, "%d-th job with id %s in gang %s", i, job.Id, gangId)
 		}

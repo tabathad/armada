@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	config2 "github.com/armadaproject/armada/internal/scheduler/config"
 	"sync/atomic"
 
 	"github.com/google/uuid"
@@ -68,11 +69,11 @@ type LeaseListener interface {
 type KubernetesLeaderController struct {
 	client   coordinationv1client.LeasesGetter
 	token    atomic.Value
-	config   LeaderConfig
+	config   config2.LeaderConfig
 	listener LeaseListener
 }
 
-func NewKubernetesLeaderController(config LeaderConfig, client coordinationv1client.LeasesGetter) *KubernetesLeaderController {
+func NewKubernetesLeaderController(config config2.LeaderConfig, client coordinationv1client.LeasesGetter) *KubernetesLeaderController {
 	return &KubernetesLeaderController{
 		client: client,
 		token:  atomic.Value{},

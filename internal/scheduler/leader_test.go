@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"github.com/armadaproject/armada/internal/scheduler/config"
 	"sync"
 	"testing"
 	"time"
@@ -151,8 +152,8 @@ func TestK8sLeaderController_BecomingLeader(t *testing.T) {
 	}
 }
 
-func testLeaderConfig() LeaderConfig {
-	return LeaderConfig{
+func testLeaderConfig() config.LeaderConfig {
+	return config.LeaderConfig{
 		LeaseLockName:      lockName,
 		LeaseLockNamespace: lockNamespace,
 		LeaseDuration:      100 * time.Millisecond,

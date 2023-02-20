@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
+	"github.com/armadaproject/armada/internal/scheduler/scheduling"
 	"math/rand"
 	"time"
 
@@ -29,7 +30,6 @@ import (
 	"github.com/armadaproject/armada/internal/common/schedulers"
 	commonvalidation "github.com/armadaproject/armada/internal/common/validation"
 	"github.com/armadaproject/armada/internal/executor/configuration"
-	"github.com/armadaproject/armada/internal/scheduler"
 	"github.com/armadaproject/armada/internal/scheduler/schedulerobjects"
 	"github.com/armadaproject/armada/pkg/api"
 	"github.com/armadaproject/armada/pkg/armadaevents"
@@ -52,8 +52,8 @@ type PulsarSubmitServer struct {
 	// Used for job submission deduplication.
 	KVStore *pgkeyvalue.PGKeyValueStore
 	// Used to check at job submit time if the job could ever be scheduled on either legacy or pulsar schedulers
-	PulsarSchedulerSubmitChecker *scheduler.SubmitChecker
-	LegacySchedulerSubmitChecker *scheduler.SubmitChecker
+	PulsarSchedulerSubmitChecker *scheduling.SubmitChecker
+	LegacySchedulerSubmitChecker *scheduling.SubmitChecker
 	// Flag to control if we enable sending messages to the pulsar scheduler
 	PulsarSchedulerEnabled bool
 	// Probability of using the pulsar scheduler.  Has no effect if PulsarSchedulerEnabled is false
