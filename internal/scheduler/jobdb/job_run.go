@@ -8,6 +8,12 @@ import (
 type JobRun struct {
 	// Unique identifier for the run
 	id uuid.UUID
+	// []byte representation of the run id.
+	// Used for efficient go-memdb lookup.
+	runId []byte
+	// []byte representation of the job id.
+	// Used for efficient go-memdb lookup.
+	jobId []byte
 	// The time the run was allocated
 	created int64
 	// The name of the executor this run has been leased to

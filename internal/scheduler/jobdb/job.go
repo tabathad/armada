@@ -14,6 +14,9 @@ import (
 type Job struct {
 	// String representation of the job id
 	id string
+	// []byte representation of the job id.
+	// Used for efficient go-memdb lookup.
+	byteId []byte
 	// Name of the queue this job belongs to.
 	queue string
 	// Jobset the job belongs to
@@ -43,7 +46,8 @@ type Job struct {
 	// True if the scheduler has marked the job as succeeded
 	succeeded bool
 	// Job Runs by run id
-	runsById map[uuid.UUID]*JobRun
+	runsById    map[uuid.UUID]*JobRun
+	jobRunPairs []*jobRunPair
 	// The currently active run.  The run with the latest timestamp is the active run
 	activeRun *JobRun
 	// The timestamp of the currently active run.
@@ -255,8 +259,11 @@ func (job *Job) HasRuns() bool {
 
 // WithNewRun creates a copy of the job with a new run on the given executor.
 func (job *Job) WithNewRun(executor string, node string) *Job {
+	id := uuid.New()
 	run := &JobRun{
 		id:       uuid.New(),
+		runId:    []byte(id.String()),
+		jobId:    job.byteId,
 		created:  time.Now().UnixNano(),
 		executor: executor,
 		node:     node,
@@ -273,6 +280,12 @@ func (job *Job) WithUpdatedRun(run *JobRun) *Job {
 		j.activeRun = run
 	}
 	j.runsById[run.id] = run
+	j.jobRunPairs = append(j.jobRunPairs, &jobRunPair{
+		runId:     run.id.String(),
+		jobId:     job.id,
+		byteRunId: run.runId,
+		byteJobId: run.jobId,
+	})
 	return j
 }
 

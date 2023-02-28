@@ -1,6 +1,8 @@
 package jobdb
 
 import (
+	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-memdb"
 	"github.com/pkg/errors"
@@ -15,6 +17,60 @@ const (
 	queuedJobsIndex = "queued"    // index for looking up queued/non-queued jobs
 )
 
+type Identifiable interface {
+	DbId(key string) []byte
+}
+
+func (job *Job) DbId(key string) []byte {
+	if key != "id" {
+		panic(fmt.Sprintf("expected id 'key', but got %s", key))
+	}
+	return job.byteId
+}
+
+func (run *JobRun) DbId(key string) []byte {
+	if key == "runId" {
+		return run.runId
+	} else if key == "jobId" {
+		return run.jobId
+	} else {
+		panic(fmt.Sprintf("expected id 'runId' or 'jobId', but got %s", key))
+	}
+}
+
+func (run *jobRunPair) DbId(key string) []byte {
+	if key == "runId" {
+		return run.byteRunId
+	} else if key == "jobId" {
+		return run.byteJobId
+	} else {
+		panic(fmt.Sprintf("expected id 'runId' or 'jobId', but got %s", key))
+	}
+}
+
+type DbIdIndex struct {
+	Key string
+}
+
+// FromArgs computes the index key from a set of arguments.
+// Takes a single argument resourceAmount of type resource.Quantity.
+func (index *DbIdIndex) FromArgs(args ...any) ([]byte, error) {
+	if len(args) != 1 {
+		return nil, errors.New("must provide exactly one argument")
+	}
+	key := args[0].([]byte)
+	return key, nil
+}
+
+// FromObject extracts the index key from a ByteObject.
+func (index *DbIdIndex) FromObject(raw any) (bool, []byte, error) {
+	obj, ok := raw.(Identifiable)
+	if !ok {
+		return false, nil, errors.Errorf("expected *Job, but got %T", raw)
+	}
+	return true, obj.DbId(index.Key), nil
+}
+
 type OldJobDb struct {
 	// In-memory database. Stores *Job.
 	// Used to efficiently iterate over jobs in sorted order.
@@ -25,6 +81,12 @@ type OldJobDb struct {
 type jobRunPair struct {
 	runId string
 	jobId string
+	// []byte representation of the run id.
+	// Used for efficient go-memdb lookup.
+	byteRunId []byte
+	// []byte representation of the job id.
+	// Used for efficient go-memdb lookup.
+	byteJobId []byte
 }
 
 func NewOldJobDb() (*OldJobDb, error) {
@@ -37,22 +99,27 @@ func NewOldJobDb() (*OldJobDb, error) {
 	}, nil
 }
 
-// Upsert will insert the given jobs if they don't already exist or update the if they do
+// Upsert will insert the given jobs if they don't already exist or update them if they do
 func (jobDb *OldJobDb) Upsert(txn *memdb.Txn, jobs []*Job) error {
 	for _, job := range jobs {
-		err := txn.Insert(jobsTable, job)
-		if err != nil {
+		if err := txn.Insert(jobsTable, job); err != nil {
 			return errors.WithStack(err)
 		}
-		for _, run := range job.runsById {
-			err := txn.Insert(runsByJobTable, &jobRunPair{
-				runId: run.id.String(),
-				jobId: job.id,
-			})
-			if err != nil {
+		for _, jobRunPair := range job.jobRunPairs {
+			if err := txn.Insert(runsByJobTable, jobRunPair); err != nil {
 				return errors.WithStack(err)
 			}
 		}
+
+		// for _, run := range job.runsById {
+		// 	err := txn.Insert(runsByJobTable, &jobRunPair{
+		// 		runId: run.id.String(),
+		// 		jobId: job.id,
+		// 	})
+		// 	if err != nil {
+		// 		return errors.WithStack(err)
+		// 	}
+		// }
 	}
 	return nil
 }
@@ -151,8 +218,14 @@ func jobDbSchema() *memdb.DBSchema {
 		idIndex: {
 			Name:    idIndex, // lookup by primary key
 			Unique:  true,
-			Indexer: &memdb.StringFieldIndex{Field: "id"},
+			Indexer: &DbIdIndex{Key: "id"},
 		},
+		// idIndex: {
+		// 	Name:    idIndex, // lookup by primary key
+		// 	Unique:  true,
+		// 	Indexer: &memdb.StringFieldIndex{Field: "id"},
+		// },
+
 		orderIndex: {
 			Name:   orderIndex, // lookup queued jobs for a given queue
 			Unique: false,
@@ -165,27 +238,38 @@ func jobDbSchema() *memdb.DBSchema {
 				},
 			},
 		},
-		queuedJobsIndex: {
-			Name:   queuedJobsIndex, // lookup queued/leased jobs globally
-			Unique: false,
-			Indexer: &memdb.CompoundIndex{
-				Indexes: []memdb.Indexer{
-					&memdb.BoolFieldIndex{Field: "queued"},
-				},
-			},
-		},
+
+		// queuedJobsIndex: {
+		// 	Name:   queuedJobsIndex, // lookup queued/leased jobs globally
+		// 	Unique: false,
+		// 	Indexer: &memdb.CompoundIndex{
+		// 		Indexes: []memdb.Indexer{
+		// 			&memdb.BoolFieldIndex{Field: "queued"},
+		// 		},
+		// 	},
+		// },
 	}
 
 	runsByJobIndexes := map[string]*memdb.IndexSchema{
+		// idIndex: {
+		// 	Name:    idIndex, // lookup by primary key
+		// 	Unique:  true,
+		// 	Indexer: &memdb.StringFieldIndex{Field: "runId"},
+		// },
+		// jobIdIndex: {
+		// 	Name:    jobIdIndex, // lookup by job id
+		// 	Unique:  true,
+		// 	Indexer: &memdb.StringFieldIndex{Field: "jobId"},
+		// },
 		idIndex: {
 			Name:    idIndex, // lookup by primary key
 			Unique:  true,
-			Indexer: &memdb.StringFieldIndex{Field: "runId"},
+			Indexer: &DbIdIndex{Key: "runId"},
 		},
 		jobIdIndex: {
 			Name:    jobIdIndex, // lookup by job id
 			Unique:  true,
-			Indexer: &memdb.StringFieldIndex{Field: "jobId"},
+			Indexer: &DbIdIndex{Key: "jobId"},
 		},
 	}
 
