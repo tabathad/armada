@@ -12,12 +12,15 @@ import (
 )
 
 func TestNewJobDBPerf(t *testing.T) {
+	startInsert := time.Now()
 	jobs := createJobs()
+	log.Infof("created jobs in %s", time.Since(startInsert))
+
 	db := NewJobDb()
 
 	// Test how long it takes to insert new rows
 	txn := db.WriteTxn()
-	startInsert := time.Now()
+	startInsert = time.Now()
 	err := db.Upsert(txn, jobs)
 	require.NoError(t, err)
 	txn.Commit()
@@ -55,7 +58,7 @@ func TestOldJobDBPerf(t *testing.T) {
 }
 
 func createJobs() []*Job {
-	const numJobs = 500000
+	const numJobs = 5000000
 	const numQueues = 10
 	jobs := make([]*Job, numJobs)
 	for i := 0; i < numJobs; i++ {
@@ -67,7 +70,7 @@ func createJobs() []*Job {
 			queued:   true,
 			runsById: map[uuid.UUID]*JobRun{},
 		}
-		jobs[i] = j.WithNewRun("testExecutor", "testNode")
+		jobs[i] = j
 	}
 	return jobs
 }

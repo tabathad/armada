@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"github.com/disgoorg/log"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
@@ -73,7 +74,7 @@ func NewPostgresJobRepository(db *pgxpool.Pool, batchSize int32) *PostgresJobRep
 // FetchJobRunErrors returns all armadaevents.JobRunErrors for the provided job run ids.  The returned map is
 // keyed by job run id.  Any dbRuns which don't have errors wil be absent from the map.
 func (r *PostgresJobRepository) FetchJobRunErrors(ctx context.Context, runIds []uuid.UUID) (map[uuid.UUID]*armadaevents.Error, error) {
-	chunks := armadaslices.Partition(runIds, int(r.batchSize))
+	chunks := armadaslices.PartitionToMaxLen(runIds, int(r.batchSize))
 
 	errorsByRunId := make(map[uuid.UUID]*armadaevents.Error, len(runIds))
 	decompressor := compress.NewZlibDecompressor()
@@ -135,10 +136,12 @@ func (r *PostgresJobRepository) FetchJobUpdates(ctx context.Context, jobSerial i
 		queries := New(tx)
 
 		// Fetch jobs
+		log.Infof("fetching row")
 		updatedJobRows, err := fetch(jobSerial, r.batchSize, func(from int64) ([]SelectUpdatedJobsRow, error) {
 			return queries.SelectUpdatedJobs(ctx, SelectUpdatedJobsParams{Serial: from, Limit: r.batchSize})
 		})
 		updatedJobs = make([]Job, len(updatedJobRows))
+		log.Infof("fetched %d rows", len(updatedJobRows))
 		for i, row := range updatedJobRows {
 			updatedJobs[i] = Job{
 				JobID:                   row.JobID,
@@ -279,6 +282,7 @@ func fetch[T hasSerial](from int64, batchSize int32, fetchBatch func(int64) ([]T
 		if err != nil {
 			return nil, err
 		}
+		log.Infof("fetched batch of len (%d)", len(batch))
 		values = append(values, batch...)
 		if len(batch) < int(batchSize) {
 			break

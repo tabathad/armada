@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/benbjohnson/immutable"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/maps"
@@ -154,7 +153,7 @@ func (l *LegacySchedulingAlgo) Schedule(ctx context.Context, txn *jobdb.Txn, job
 }
 
 type JobQueueIteratorAdapter struct {
-	it *immutable.SortedSetIterator[*jobdb.Job]
+	it *jobdb.SortedSetIterator[*jobdb.Job]
 }
 
 func (it *JobQueueIteratorAdapter) Next() (LegacySchedulerJob, error) {

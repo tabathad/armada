@@ -343,6 +343,11 @@ func (s *Scheduler) generateUpdateMessages(ctx context.Context, updatedJobs []*j
 			failedRunIds = append(failedRunIds, run.Id())
 		}
 	}
+
+	if len(failedRunIds) == 0 {
+		return nil, nil
+	}
+
 	jobRunErrors, err := s.jobRepository.FetchJobRunErrors(ctx, failedRunIds)
 	if err != nil {
 		return nil, err

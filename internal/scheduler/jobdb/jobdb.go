@@ -3,18 +3,17 @@ package jobdb
 import (
 	"sync"
 
-	"github.com/benbjohnson/immutable"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
 )
 
-var emptyList = immutable.NewSortedSet[*Job](JobPriorityComparer{})
+var emptyList = NewSortedSet[*Job](JobPriorityComparer{})
 
 type JobDb struct {
 	jobsById    map[string]*Job
 	jobsByRunId map[uuid.UUID]string
-	jobsByQueue map[string]immutable.SortedSet[*Job]
+	jobsByQueue map[string]SortedSet[*Job]
 	copyMutex   sync.Mutex
 	writerMutex sync.Mutex
 }
@@ -23,7 +22,7 @@ func NewJobDb() *JobDb {
 	return &JobDb{
 		jobsById:    map[string]*Job{},
 		jobsByRunId: map[uuid.UUID]string{},
-		jobsByQueue: map[string]immutable.SortedSet[*Job]{},
+		jobsByQueue: map[string]SortedSet[*Job]{},
 		copyMutex:   sync.Mutex{},
 	}
 }
@@ -33,6 +32,8 @@ func (jobDb *JobDb) Upsert(txn *Txn, jobs []*Job) error {
 	if err := jobDb.checkWritableTransaction(txn); err != nil {
 		return err
 	}
+
+	jobsByQueue := make(map[string][]*Job)
 	for _, job := range jobs {
 		existingJob := txn.jobsById[job.id]
 		if existingJob != nil {
@@ -46,15 +47,23 @@ func (jobDb *JobDb) Upsert(txn *Txn, jobs []*Job) error {
 			txn.jobsByRunId[run.id] = job.id
 		}
 		if job.Queued() {
-			newQueue, ok := txn.jobsByQueue[job.queue]
-			if !ok {
-				q := emptyList
-				newQueue = q
-			}
-			newQueue = newQueue.Add(job)
-			txn.jobsByQueue[job.queue] = newQueue
+			queuedJobs := jobsByQueue[job.queue]
+			queuedJobs = append(queuedJobs, job)
+			jobsByQueue[job.queue] = queuedJobs
 		}
 	}
+	for queue, newJobs := range jobsByQueue {
+		newQueue, ok := txn.jobsByQueue[queue]
+		if !ok {
+			newQueue = emptyList
+		}
+		builder := NewSortedSetBuilderWithInitial[*Job](newQueue)
+		for _, job := range newJobs {
+			builder.Set(job)
+		}
+		txn.jobsByQueue[queue] = builder.ToSet()
+	}
+
 	return nil
 }
 
@@ -81,7 +90,7 @@ func (jobDb *JobDb) HasQueuedJobs(txn *Txn, queue string) bool {
 }
 
 // QueuedJobs returns true if the queue has any jobs in the running state or false otherwise
-func (jobDb *JobDb) QueuedJobs(txn *Txn, queue string) *immutable.SortedSetIterator[*Job] {
+func (jobDb *JobDb) QueuedJobs(txn *Txn, queue string) *SortedSetIterator[*Job] {
 	jobQueue, ok := txn.jobsByQueue[queue]
 	if ok {
 		return jobQueue.Iterator()
@@ -169,7 +178,7 @@ type Txn struct {
 	readOnly    bool
 	jobsById    map[string]*Job
 	jobsByRunId map[uuid.UUID]string
-	jobsByQueue map[string]immutable.SortedSet[*Job]
+	jobsByQueue map[string]SortedSet[*Job]
 	jobDb       *JobDb
 	active      bool
 }
