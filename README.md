@@ -2,7 +2,7 @@
 <img src="./logo.svg" width="200"/>
 
 <p><a href="https://circleci.com/gh/armadaproject/armada"><img src="https://circleci.com/gh/helm/helm.svg?style=shield" alt="CircleCI"></a>
-<a href="https://goreportcard.com/report/github.com/armadaproject/armada"><img src="https://goreportcard.com/badge/github.com/armadaproject/armada" alt="Go Report Card"></a><a href="https://clomonitor.io/projects/cncf/armada"><img src="https://clomonitor.io/api/projects/cncf/armada/badge"</p>
+<a href="https://goreportcard.com/report/github.com/armadaproject/armada"><img src="https://goreportcard.com/badge/github.com/armadaproject/armada" alt="Go Report Card"></a><a href="https://clomonitor.io/projects/cncf/armada"><img src="https://clomonitor.io/api/projects/cncf/armada/badge"></p>
 </div>
 
 # Armada
