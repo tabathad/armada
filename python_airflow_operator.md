@@ -12,306 +12,168 @@ This class provides integration with Airflow and Armada
 ## armada.operators.armada module
 
 
-### _class_ armada.operators.armada.ArmadaOperator(name, armada_client, job_service_client, armada_queue, job_request_items, lookout_url_template=None, \*\*kwargs)
-Bases: `BaseOperator`
+### _class_ armada.operators.armada.ArmadaOperator(name, channel_args, armada_queue, job_request, job_set_prefix='', lookout_url_template=None, poll_interval=30, container_logs=None, k8s_token_retriever=None, deferrable=False, job_acknowledgement_timeout=300, \*\*kwargs)
+Bases: `BaseOperator`, `LoggingMixin`
 
-Implementation of an ArmadaOperator for airflow.
+An Airflow operator that manages Job submission to Armada.
 
-Airflow operators inherit from BaseOperator.
-
-
-* **Parameters**
-
-    
-    * **name** (*str*) – The name of the airflow task
-
-
-    * **armada_client** (*ArmadaClient*) – The Armada Python GRPC client
-    that is used for interacting with Armada
-
-
-    * **job_service_client** (*JobServiceClient*) – The JobServiceClient that is used for polling
-
-
-    * **armada_queue** (*str*) – The queue name for Armada.
-
-
-    * **job_request_items** – A PodSpec that is used by Armada for submitting a job
-
-
-    * **lookout_url_template** (*str** | **None*) – A URL template to be used to provide users
-    a valid link to the related lookout job in this operator’s log.
-    The format should be:
-    “[https://lookout.armada.domain/jobs](https://lookout.armada.domain/jobs)?job_id=<job_id>” where <job_id> will
-    be replaced with the actual job ID.
-
-
-
-* **Returns**
-
-    a job service client instance
-
-
-
-#### execute(context)
-Executes the Armada Operator.
-
-Runs an Armada job and calls the job_service_client for polling.
-
-
-* **Parameters**
-
-    **context** – The airflow context.
-
-
-
-* **Returns**
-
-    None
-
-
-
-* **Return type**
-
-    None
-
-
-
-### armada.operators.armada.annotate_job_request_items(context, job_request_items)
-Annotates the inbound job request items with Airflow context elements
+This operator submits a job to an Armada cluster, polls for its completion,
+and handles job cancellation if the Airflow task is killed.
 
 
 * **Parameters**
 
     
-    * **context** – The airflow context.
+    * **name** (*str*) – 
 
 
-    * **job_request_items** (*List**[**JobSubmitRequestItem**]*) – The job request items to be sent to armada
+    * **channel_args** (*GrpcChannelArgs*) – 
 
 
-
-* **Returns**
-
-    annotated job request items for armada
-
-
-
-* **Return type**
-
-    *List*[*JobSubmitRequestItem*]
-
-
-
-### armada.operators.armada.get_annotation_key_prefix()
-Provides the annotation key perfix,
-which can be specified in env var ANNOTATION_KEY_PREFIX.
-A default is provided if the env var is not defined
-
-
-* **Returns**
-
-    string annotation key prefix
-
-
-
-* **Return type**
-
-    str
-
-
-## armada.operators.jobservice module
-
-
-### _class_ armada.operators.jobservice.JobServiceClient(channel, max_workers=None)
-Bases: `object`
-
-The JobService Client
-
-Implementation of gRPC stubs from JobService
-
-
-* **Parameters**
-
-    
-    * **channel** – gRPC channel used for authentication. See
-    [https://grpc.github.io/grpc/python/grpc.html](https://grpc.github.io/grpc/python/grpc.html)
-    for more information.
-
-
-    * **max_workers** (*int** | **None*) – number of cores for thread pools, if unset, defaults
-    to number of CPUs
-
-
-
-* **Returns**
-
-    a job service client instance
-
-
-
-#### get_job_status(queue, job_set_id, job_id)
-Get job status of a given job in a queue and job_set_id.
-
-Uses the GetJobStatus rpc to get a status of your job
-
-
-* **Parameters**
-
-    
-    * **queue** (*str*) – The name of the queue
-
-
-    * **job_set_id** (*str*) – The name of the job set (a grouping of jobs)
-
-
-    * **job_id** (*str*) – The id of the job
-
-
-
-* **Returns**
-
-    A Job Service Request (State, Error)
-
-
-
-* **Return type**
-
-    *JobServiceResponse*
-
-
-
-#### health()
-Health Check for GRPC Request
-
-
-* **Return type**
-
-    *HealthCheckResponse*
-
-
-## armada.operators.utils module
-
-
-### _class_ armada.operators.utils.JobState(value)
-Bases: `Enum`
-
-An enumeration.
-
-
-#### CANCELLED(_ = _ )
-
-#### CONNECTION_ERR(_ = _ )
-
-#### DUPLICATE_FOUND(_ = _ )
-
-#### FAILED(_ = _ )
-
-#### JOB_ID_NOT_FOUND(_ = _ )
-
-#### RUNNING(_ = _ )
-
-#### SUBMITTED(_ = _ )
-
-#### SUCCEEDED(_ = _ )
-
-### armada.operators.utils.airflow_error(job_state, name, job_id)
-Throw an error on a terminal event if job errored out
-
-
-* **Parameters**
-
-    
-    * **job_state** (*JobState*) – A JobState enum class
-
-
-    * **name** (*str*) – The name of your armada job
-
-
-    * **job_id** (*str*) – The job id that armada assigns to it
-
-
-
-* **Returns**
-
-    No Return or an AirflowFailException.
-
-
-AirflowFailException tells Airflow Schedule to not reschedule the task
-
-
-### armada.operators.utils.default_job_status_callable(armada_queue, job_set_id, job_id, job_service_client)
-
-* **Parameters**
-
-    
     * **armada_queue** (*str*) – 
 
 
-    * **job_set_id** (*str*) – 
+    * **job_request** (*JobSubmitRequestItem*) – 
 
 
-    * **job_id** (*str*) – 
+    * **job_set_prefix** (*str** | **None*) – 
 
 
-    * **job_service_client** (*JobServiceClient*) – 
+    * **lookout_url_template** (*str** | **None*) – 
+
+
+    * **poll_interval** (*int*) – 
+
+
+    * **container_logs** (*str** | **None*) – 
+
+
+    * **k8s_token_retriever** (*TokenRetriever** | **None*) – 
+
+
+    * **deferrable** (*bool*) – 
+
+
+    * **job_acknowledgement_timeout** (*int*) – 
+
+
+
+#### _property_ client(_: ArmadaClien_ )
+
+#### execute(context)
+Submits the job to Armada and polls for completion.
+
+
+* **Parameters**
+
+    **context** (*Context*) – The execution context provided by Airflow.
 
 
 
 * **Return type**
 
-    *JobServiceResponse*
+    None
 
 
 
-### armada.operators.utils.job_state_from_pb(state)
+#### on_kill()
+Override this method to clean up subprocesses when a task instance gets killed.
+
+Any use of the threading, subprocess or multiprocessing module within an
+operator needs to be cleaned up, or it will leave ghost processes behind.
+
 
 * **Return type**
 
-    *JobState*
+    None
 
 
 
-### armada.operators.utils.search_for_job_complete(armada_queue, job_set_id, airflow_task_name, job_id, job_service_client=None, job_status_callable=<function default_job_status_callable>, time_out_for_failure=7200)
-Poll JobService cache until you get a terminated event.
+#### pod_manager(k8s_context)
 
-A terminated event is SUCCEEDED, FAILED or CANCELLED
+* **Parameters**
+
+    **k8s_context** (*str*) – 
+
+
+
+* **Return type**
+
+    *PodLogManager*
+
+
+
+#### render_template_fields(context, jinja_env=None)
+Template all attributes listed in self.template_fields.
+This mutates the attributes in-place and is irreversible.
+
+Args:
+
+    context (Context): The execution context provided by Airflow.
 
 
 * **Parameters**
 
     
-    * **armada_queue** (*str*) – The queue for armada
+    * **context** (*Context*) – Airflow Context dict wi1th values to apply on content
 
 
-    * **job_set_id** (*str*) – Your job_set_id
-
-
-    * **airflow_task_name** (*str*) – The name of your armada job
-
-
-    * **job_id** (*str*) – The name of the job id that armada assigns to it
-
-
-    * **job_service_client** (*JobServiceClient** | **None*) – A JobServiceClient that is used for polling.
-    It is optional only for testing
-
-
-    * **job_status_callable** – A callable object for test injection.
-
-
-    * **time_out_for_failure** (*int*) – The amount of time a job
-    can be in job_id_not_found
-    before we decide it was a invalid job
-
-
-
-* **Returns**
-
-    A tuple of JobStateEnum, message
+    * **jinja_env** (*Environment** | **None*) – jinja’s environment to use for rendering.
 
 
 
 * **Return type**
 
-    *Tuple*[*JobState*, str]
+    None
+
+
+
+#### template_fields(_: Sequence[str_ _ = ('job_request', 'job_set_prefix'_ )
+Initializes a new ArmadaOperator.
+
+
+* **Parameters**
+
+    
+    * **name** (*str*) – The name of the job to be submitted.
+
+
+    * **channel_args** (*GrpcChannelArgs*) – The gRPC channel arguments for connecting to the Armada server.
+
+
+    * **armada_queue** (*str*) – The name of the Armada queue to which the job will be submitted.
+
+
+    * **job_request** (*JobSubmitRequestItem*) – The job to be submitted to Armada.
+
+
+    * **job_set_prefix** (*Optional**[**str**]*) – A string to prepend to the jobSet name
+
+
+    * **lookout_url_template** – Template for creating lookout links. If not specified
+
+
+then no tracking information will be logged.
+:type lookout_url_template: Optional[str]
+:param poll_interval: The interval in seconds between polling for job status updates.
+:type poll_interval: int
+:param container_logs: Name of container whose logs will be published to stdout.
+:type container_logs: Optional[str]
+:param k8s_token_retriever: A serialisable Kubernetes token retriever object. We use
+this to read logs from Kubernetes pods.
+:type k8s_token_retriever: Optional[TokenRetriever]
+:param deferrable: Whether the operator should run in a deferrable mode, allowing
+for asynchronous execution.
+:type deferrable: bool
+:param job_acknowledgement_timeout: The timeout in seconds to wait for a job to be
+acknowledged by Armada.
+:type job_acknowledgement_timeout: int
+:param kwargs: Additional keyword arguments to pass to the BaseOperator.
+
+## armada.operators.armada_deferrable module
+
+## armada.operators.jobservice module
+
+## armada.operators.jobservice_asyncio module
+
+## armada.operators.utils module
